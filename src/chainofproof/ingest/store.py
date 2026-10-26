@@ -10,6 +10,7 @@ from contextlib import closing, contextmanager
 from chainofproof.config import Paths
 from chainofproof.custody.db import connect
 from chainofproof.custody.hashing import iso_utc, utc_now
+from chainofproof.custody.ledger import Ledger
 from chainofproof.errors import UserError
 from chainofproof.schemas.custody import (
     CASE_ID_PATTERN,
@@ -76,7 +77,11 @@ class EvidenceStore:
 
     # ---- cases ---------------------------------------------------------------------------
     def create_case(self, case_id: str, title: str = "", description: str = "") -> CaseRecord:
-        """Create a case; raises StoreError if the ID is invalid or already exists."""
+        """Create a case and log ``case_create`` to the ledger.
+
+        Raises StoreError if the ID is invalid or already exists (nothing is written), or if the
+        ledger append fails after the DB commit (the case then exists without a ledger entry).
+        """
         validate_case_id(case_id)
         now = iso_utc(utc_now())
         try:
@@ -87,6 +92,14 @@ class EvidenceStore:
                 )
         except sqlite3.IntegrityError as e:
             raise StoreError(f"case {case_id!r} already exists") from e
+        try:
+            Ledger(self.paths).append(
+                "ingest", "case_create", details={"case_id": case_id, "title": title}
+            )
+        except Exception as e:
+            raise StoreError(
+                f"case {case_id!r} was created but the ledger entry failed: {e}"
+            ) from e
         return self.get_case(case_id)  # type: ignore[return-value]
 
     def get_case(self, case_id: str) -> CaseRecord | None:

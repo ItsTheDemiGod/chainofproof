@@ -33,7 +33,7 @@ Agents may all use the same local model with different prompts and different too
 ## Phases (update the status as we go)
 - Phase 0: Setup and CLAUDE.md [DONE]
 - Phase 1: Evidence ingestion and chain of custody [DONE]
-- Phase 2: Datasets and ground truth (answer keys) [TODO]
+- Phase 2: Datasets and ground truth (answer keys) [DONE]
 - Phase 3: Forensic tool layer and normalized event format [TODO]
 - Phase 4: Evidence graph and contradiction detection [TODO]
 - Phase 5: Agent core (LLM client, planner loop, citation verifier) [TODO]
@@ -48,6 +48,9 @@ Agents may all use the same local model with different prompts and different too
 - Use the logging module in library code (no print), rich/typer for CLI output.
 - ruff for lint and format, pytest for tests. Every module gets tests. Tests must not require Ollama unless marked with @pytest.mark.llm.
 - Evidence IDs look like EV-000001; findings like FND-0001; ledger entries like LED-000001.
+- Ground-truth IDs: GT-ACT-001 (attacker actions), GT-CON-001 (contradictions), GT-DEC-001 (decoy/out-of-scope), GT-INJ-001 (injections, reserved for Phase 7), GT-MIS-001 (expected missing evidence).
+- Phase 2 alignment layer: real EVTX captures are independent; scenario.yaml defines per-source time offsets and host aliases (applied in Phase 3 normalization, raw evidence never altered). Real datasets live in data/downloads (gitignored, never modified); synthetic companions are always labeled SYNTHETIC.
+- Run ruff only with explicit paths (ruff check/format src tests scripts), never on the repo root: data/downloads must never be touched.
 - Small functions, docstrings on public functions, no giant files.
 - Config lives in config/settings.yaml; secrets (optional API keys) only in .env which is gitignored.
 - data/ is gitignored (evidence is large and sensitive). Scenario answer keys in scenarios/ ARE committed.

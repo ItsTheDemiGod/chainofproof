@@ -1,0 +1,465 @@
+{
+  "scenario_id": "credtheft_lateral_v1",
+  "dataset_commit": "4ceed2f4706daf601c212a8f91c113dd85349a2c",
+  "sources": [
+    {
+      "source_key": "s1_lsass_mimikatz",
+      "relative_path": "Credential Access/sysmon_10_lsass_mimikatz_sekurlsa_logonpasswords.evtx",
+      "sha256": "9a1689574ed08c1fb18e7ff3f3bed612109aedcb7bf8efbf3537d756e669e96f",
+      "record_count": 1,
+      "corrupt_records": 0,
+      "first_event_time": "2019-03-17T19:37:11.661928Z",
+      "last_event_time": "2019-03-17T19:37:11.661928Z",
+      "span_seconds": 0.0,
+      "computers": [
+        "PC04.example.corp"
+      ],
+      "channels": [
+        "Microsoft-Windows-Sysmon/Operational"
+      ],
+      "top_event_ids": [
+        {
+          "event_id": 10,
+          "count": 1
+        }
+      ],
+      "accounts": [],
+      "instruction_like_fields": []
+    },
+    {
+      "source_key": "s2_pth_logon",
+      "relative_path": "Lateral Movement/LM_4624_mimikatz_sekurlsa_pth_source_machine.evtx",
+      "sha256": "bbfd87cacdd56a9135de1838666937cd6c74daba47b366bba0c11f95ce97f461",
+      "record_count": 6,
+      "corrupt_records": 0,
+      "first_event_time": "2019-03-18T11:06:25.485214Z",
+      "last_event_time": "2019-03-18T11:06:46.305151Z",
+      "span_seconds": 20.819937,
+      "computers": [
+        "PC01.example.corp"
+      ],
+      "channels": [
+        "Security"
+      ],
+      "top_event_ids": [
+        {
+          "event_id": 4688,
+          "count": 3
+        },
+        {
+          "event_id": 1102,
+          "count": 1
+        },
+        {
+          "event_id": 4624,
+          "count": 1
+        },
+        {
+          "event_id": 4672,
+          "count": 1
+        }
+      ],
+      "accounts": [
+        "PC01$",
+        "user01"
+      ],
+      "instruction_like_fields": []
+    },
+    {
+      "source_key": "s3_psexec_smb",
+      "relative_path": "Lateral Movement/LM_sysmon_psexec_smb_meterpreter.evtx",
+      "sha256": "18ffdda9c24e593d6b1414b6e05c7f7a5dbffb8588a387c165431b61ab52d76f",
+      "record_count": 10,
+      "corrupt_records": 0,
+      "first_event_time": "2019-04-30T20:26:51.793589Z",
+      "last_event_time": "2019-04-30T20:26:54.152962Z",
+      "span_seconds": 2.359373,
+      "computers": [
+        "IEWIN7"
+      ],
+      "channels": [
+        "Microsoft-Windows-Sysmon/Operational"
+      ],
+      "top_event_ids": [
+        {
+          "event_id": 13,
+          "count": 3
+        },
+        {
+          "event_id": 1,
+          "count": 3
+        },
+        {
+          "event_id": 3,
+          "count": 2
+        },
+        {
+          "event_id": 18,
+          "count": 1
+        },
+        {
+          "event_id": 10,
+          "count": 1
+        }
+      ],
+      "accounts": [
+        "NT AUTHORITY\\SYSTEM"
+      ],
+      "instruction_like_fields": []
+    },
+    {
+      "source_key": "s4_renamed_psexec",
+      "relative_path": "Defense Evasion/DE_renamed_psexec_service_sysmon_17_18.evtx",
+      "sha256": "3b58311891bc80b239da102dec9c462d9c8d07c1f0ba5fedaf2c59e1e4447179",
+      "record_count": 11,
+      "corrupt_records": 0,
+      "first_event_time": "2020-09-27T13:42:00.726774Z",
+      "last_event_time": "2020-09-27T13:42:15.530783Z",
+      "span_seconds": 14.804009,
+      "computers": [
+        "MSEDGEWIN10"
+      ],
+      "channels": [
+        "Microsoft-Windows-Sysmon/Operational"
+      ],
+      "top_event_ids": [
+        {
+          "event_id": 18,
+          "count": 7
+        },
+        {
+          "event_id": 17,
+          "count": 4
+        }
+      ],
+      "accounts": [],
+      "instruction_like_fields": []
+    },
+    {
+      "source_key": "s5_dcsync",
+      "relative_path": "Credential Access/CA_DCSync_4662.evtx",
+      "sha256": "679b2ff27af6c932c07bf3e81391e455fae98e69bf3aff0f524e31aadc418131",
+      "record_count": 3,
+      "corrupt_records": 0,
+      "first_event_time": "2019-05-08T02:10:43.487217Z",
+      "last_event_time": "2019-05-08T02:10:43.487217Z",
+      "span_seconds": 0.0,
+      "computers": [
+        "DC1.insecurebank.local"
+      ],
+      "channels": [
+        "Security"
+      ],
+      "top_event_ids": [
+        {
+          "event_id": 4662,
+          "count": 3
+        }
+      ],
+      "accounts": [
+        "Administrator"
+      ],
+      "instruction_like_fields": []
+    },
+    {
+      "source_key": "d1_winlogon_persist",
+      "relative_path": "Persistence/sysmon_13_1_persistence_via_winlogon_shell.evtx",
+      "sha256": "78592aa982a478d1a65f56853bdf3817a3d5c79db3b1ca64642e1a2e16064423",
+      "record_count": 25,
+      "corrupt_records": 0,
+      "first_event_time": "2019-06-14T22:22:17.988371Z",
+      "last_event_time": "2019-06-14T22:23:53.358488Z",
+      "span_seconds": 95.370117,
+      "computers": [
+        "IEWIN7"
+      ],
+      "channels": [
+        "Microsoft-Windows-Sysmon/Operational"
+      ],
+      "top_event_ids": [
+        {
+          "event_id": 1,
+          "count": 19
+        },
+        {
+          "event_id": 7,
+          "count": 2
+        },
+        {
+          "event_id": 5,
+          "count": 2
+        },
+        {
+          "event_id": 11,
+          "count": 1
+        },
+        {
+          "event_id": 13,
+          "count": 1
+        }
+      ],
+      "accounts": [
+        "IEWIN7\\IEUser",
+        "NT AUTHORITY\\SYSTEM"
+      ],
+      "instruction_like_fields": []
+    },
+    {
+      "source_key": "d2_rundll32_lolbin",
+      "relative_path": "Execution/exec_sysmon_1_lolbin_rundll32_advpack_RegisterOCX.evtx",
+      "sha256": "6d5b52398a67b36c160ec22db8e027efbc3e40943075d2d79c748931bc8d9982",
+      "record_count": 2,
+      "corrupt_records": 0,
+      "first_event_time": "2019-05-12T14:18:03.589506Z",
+      "last_event_time": "2019-05-12T14:18:09.589506Z",
+      "span_seconds": 6.0,
+      "computers": [
+        "IEWIN7"
+      ],
+      "channels": [
+        "Microsoft-Windows-Sysmon/Operational"
+      ],
+      "top_event_ids": [
+        {
+          "event_id": 1,
+          "count": 2
+        }
+      ],
+      "accounts": [
+        "IEWIN7\\IEUser"
+      ],
+      "instruction_like_fields": []
+    }
+  ],
+  "key_events": [
+    {
+      "stage_id": "S1",
+      "source_key": "s1_lsass_mimikatz",
+      "result": {
+        "events": [
+          {
+            "record_id": 4807,
+            "event_id": 10,
+            "channel": "Microsoft-Windows-Sysmon/Operational",
+            "real_time": "2019-03-17T19:37:11.661928Z",
+            "rationale": "EventID 10, TargetImage=lsass.exe, GrantedAccess, SourceImage",
+            "supports": [
+              "T1003.001"
+            ],
+            "facts": {
+              "SourceImage": "C:\\Users\\IEUser\\Desktop\\mimikatz_trunk\\Win32\\mimikatz.exe",
+              "GrantedAccess": "0x00001010"
+            }
+          }
+        ],
+        "technique_confidence": {
+          "T1003.001": "high"
+        },
+        "note": ""
+      }
+    },
+    {
+      "stage_id": "S2",
+      "source_key": "s2_pth_logon",
+      "result": {
+        "events": [
+          {
+            "record_id": 432903,
+            "event_id": 4624,
+            "channel": "Security",
+            "real_time": "2019-03-18T11:06:29.911579Z",
+            "rationale": "EventID 4624, LogonType 9 + LogonProcessName seclogo, TargetUserName",
+            "supports": [
+              "T1550.002"
+            ],
+            "facts": {
+              "TargetUserName": "user01",
+              "TargetLogonId": "0x0000000004530f0f",
+              "LogonType": "9"
+            }
+          },
+          {
+            "record_id": 432904,
+            "event_id": 4672,
+            "channel": "Security",
+            "real_time": "2019-03-18T11:06:29.911579Z",
+            "rationale": "EventID 4672, SubjectLogonId equals the 4624 TargetLogonId",
+            "supports": [
+              "T1550.002"
+            ],
+            "facts": {
+              "SubjectUserName": "user01",
+              "SubjectLogonId": "0x0000000004530f0f"
+            }
+          }
+        ],
+        "technique_confidence": {
+          "T1550.002": "medium"
+        },
+        "note": "LogonType 9 'seclogo' is also produced by legitimate runas /netonly, so the logon alone does not prove a stolen hash; hence medium"
+      }
+    },
+    {
+      "stage_id": "S3",
+      "source_key": "s3_psexec_smb",
+      "result": {
+        "events": [
+          {
+            "record_id": 9804,
+            "event_id": 18,
+            "channel": "Microsoft-Windows-Sysmon/Operational",
+            "real_time": "2019-04-30T20:26:51.793589Z",
+            "rationale": "EventID 18, PipeName=ntsvcs (remote service control over SMB)",
+            "supports": [
+              "T1021.002"
+            ],
+            "facts": {
+              "PipeName": "\\ntsvcs",
+              "Image": "System"
+            }
+          },
+          {
+            "record_id": 9806,
+            "event_id": 13,
+            "channel": "Microsoft-Windows-Sysmon/Operational",
+            "real_time": "2019-04-30T20:26:51.981089Z",
+            "rationale": "EventID 13, TargetObject ends \\ImagePath under \\services\\, Image=services.exe",
+            "supports": [
+              "T1569.002"
+            ],
+            "facts": {
+              "TargetObject": "HKLM\\System\\CurrentControlSet\\services\\hello\\ImagePath"
+            }
+          },
+          {
+            "record_id": 9807,
+            "event_id": 1,
+            "channel": "Microsoft-Windows-Sysmon/Operational",
+            "real_time": "2019-04-30T20:26:52.090464Z",
+            "rationale": "EventID 1, ParentImage=services.exe, Image, User",
+            "supports": [
+              "T1569.002"
+            ],
+            "facts": {
+              "Image": "C:\\Windows\\System32\\cmd.exe",
+              "User": "NT AUTHORITY\\SYSTEM"
+            }
+          }
+        ],
+        "technique_confidence": {
+          "T1021.002": "medium",
+          "T1569.002": "medium"
+        },
+        "note": "no network logon (4624/5140) or ADMIN$ file copy in this file: the SMB link rests on the ntsvcs pipe only; the service is not PsExec itself (the binary is not visible)"
+      }
+    },
+    {
+      "stage_id": "S4",
+      "source_key": "s4_renamed_psexec",
+      "result": {
+        "events": [
+          {
+            "record_id": 409645,
+            "event_id": 17,
+            "channel": "Microsoft-Windows-Sysmon/Operational",
+            "real_time": "2020-09-27T13:42:00.726774Z",
+            "rationale": "EventID 17, Image=svchost.exe outside \\Windows\\System32 (name/path mismatch)",
+            "supports": [
+              "T1036.003"
+            ],
+            "facts": {
+              "Image": "C:\\Windows\\svchost.exe",
+              "PipeName": "\\svchost"
+            }
+          },
+          {
+            "record_id": 409647,
+            "event_id": 17,
+            "channel": "Microsoft-Windows-Sysmon/Operational",
+            "real_time": "2020-09-27T13:42:01.092665Z",
+            "rationale": "EventID 17, PipeName matches <name>-<host>-<pid>-stdin/out/err",
+            "supports": [
+              "T1569.002"
+            ],
+            "facts": {
+              "PipeName": "\\svchost-MSEDGEWIN10-8116-stdin"
+            }
+          },
+          {
+            "record_id": 409650,
+            "event_id": 18,
+            "channel": "Microsoft-Windows-Sysmon/Operational",
+            "real_time": "2020-09-27T13:42:01.182772Z",
+            "rationale": "EventID 18, Image=PsExec.exe connects the PsExec-style pipe",
+            "supports": [
+              "T1569.002"
+            ],
+            "facts": {
+              "Image": "C:\\Windows\\system32\\PsExec.exe",
+              "PipeName": "\\svchost-MSEDGEWIN10-8116-stdin"
+            }
+          }
+        ],
+        "technique_confidence": {
+          "T1036.003": "medium",
+          "T1569.002": "high"
+        },
+        "note": "the rename is inferred from the image path; no file hash or PE name"
+      }
+    },
+    {
+      "stage_id": "S5",
+      "source_key": "s5_dcsync",
+      "result": {
+        "events": [
+          {
+            "record_id": 202791,
+            "event_id": 4662,
+            "channel": "Security",
+            "real_time": "2019-05-08T02:10:43.487217Z",
+            "rationale": "EventID 4662, Properties contains a replication-rights GUID, SubjectUserName",
+            "supports": [
+              "T1003.006"
+            ],
+            "facts": {
+              "SubjectUserName": "Administrator",
+              "SubjectLogonId": "0x00000000040c6511"
+            }
+          },
+          {
+            "record_id": 202792,
+            "event_id": 4662,
+            "channel": "Security",
+            "real_time": "2019-05-08T02:10:43.487217Z",
+            "rationale": "EventID 4662, Properties contains a replication-rights GUID, SubjectUserName",
+            "supports": [
+              "T1003.006"
+            ],
+            "facts": {
+              "SubjectUserName": "Administrator",
+              "SubjectLogonId": "0x00000000040c6511"
+            }
+          },
+          {
+            "record_id": 202793,
+            "event_id": 4662,
+            "channel": "Security",
+            "real_time": "2019-05-08T02:10:43.487217Z",
+            "rationale": "EventID 4662, Properties contains a replication-rights GUID, SubjectUserName",
+            "supports": [
+              "T1003.006"
+            ],
+            "facts": {
+              "SubjectUserName": "Administrator",
+              "SubjectLogonId": "0x00000000040c6511"
+            }
+          }
+        ],
+        "technique_confidence": {
+          "T1003.006": "high"
+        },
+        "note": "subject is a user account (not a DC machine account); source host of the request is not in this file"
+      }
+    }
+  ]
+}

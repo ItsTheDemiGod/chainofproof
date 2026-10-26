@@ -14,6 +14,7 @@ from rich.console import Console
 from rich.logging import RichHandler
 from rich.table import Table
 
+from chainofproof import cli_scenarios
 from chainofproof.config import Paths, get_paths
 from chainofproof.custody.ledger import Ledger
 from chainofproof.errors import UserError
@@ -89,7 +90,6 @@ def case_create(
     """Create a case (its ID becomes a folder name)."""
     paths = _paths(ctx)
     case = EvidenceStore(paths).create_case(case_id, title, description)
-    Ledger(paths).append("cli", "case_create", details={"case_id": case_id, "title": title})
     out.print(f"created case {case.case_id}")
 
 
@@ -199,6 +199,17 @@ def ledger_verify(ctx: typer.Context) -> None:
     raise typer.Exit(1)
 
 
+@app.command("ledger-recover")
+@_handled
+def ledger_recover(ctx: typer.Context) -> None:
+    """Explicit crash recovery: re-sync a head anchor that lags by exactly one entry."""
+    res, msg = Ledger(_paths(ctx)).recover()
+    if not res.ok:
+        err.print(f"[red]{msg}[/red]", highlight=False)
+        raise typer.Exit(1)
+    out.print(msg, highlight=False, markup=False)
+
+
 @app.command("ledger-head")
 @_handled
 def ledger_head(ctx: typer.Context) -> None:
@@ -206,3 +217,6 @@ def ledger_head(ctx: typer.Context) -> None:
     out.print(
         json.dumps(Ledger(_paths(ctx)).export_head(), indent=2), highlight=False, markup=False
     )
+
+
+cli_scenarios.register(app, _handled, out, err)

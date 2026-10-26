@@ -19,7 +19,7 @@ ollama pull llama3.1:8b
 .venv\Scripts\python.exe -m pytest -m "not llm"
 ```
 
-## How to use (Phase 1 CLI)
+## How to use (CLI)
 Run `chainofproof <command>` (or `.venv\Scripts\python.exe -m chainofproof <command>`).
 Set `CHAINOFPROOF_BASE_DIR` to use a throwaway data root instead of `data/`.
 
@@ -34,5 +34,15 @@ Set `CHAINOFPROOF_BASE_DIR` to use a throwaway data root instead of `data/`.
 | `ledger-show [--tail N]` | recent ledger entries |
 | `ledger-verify` | check hash chain + head anchor (exit 1 if broken) |
 | `ledger-head` | head as JSON (publish it externally) |
+| `ledger-recover` | explicit crash recovery: re-sync a head anchor that lags by exactly one entry (refuses anything that looks like truncation or tampering) |
+| `scenario-list` | scenarios and their answer-key variants |
+| `scenario-inventory SCENARIO_ID [--force]` | metadata inventory + key-event discovery of the real EVTX files, writes `inventory.json` |
+| `scenario-keys SCENARIO_ID` | (re)write `key_clean.yaml` / `key_perturbed.yaml` |
+| `scenario-generate SCENARIO_ID clean\|perturbed [--force]` | write the SYNTHETIC companion files |
+| `scenario-build SCENARIO_ID clean\|perturbed [--force]` | verify dataset hashes, generate, create case `<id>_<variant>`, ingest everything |
+| `scenario-verify SCENARIO_ID` | dataset hashes, alignment, keys, generator determinism (exit 0/1) |
+| `scenario-key-show SCENARIO_ID clean\|perturbed` | answer key as tables |
+
+Datasets live in `data/downloads/` (gitignored); see `docs/scenarios.md`.
 
 Tamper demo (temp dir only): `.venv\Scripts\python.exe scripts\demo_tamper.py`

@@ -10,6 +10,8 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "pydantic>=2",
+    "python-evtx",
+    "defusedxml",
     "pyyaml",
     "python-dotenv",
     "httpx",
@@ -30,10 +32,14 @@ where = ["src"]
 [tool.ruff]
 line-length = 100
 src = ["src", "tests", "scripts"]
+extend-exclude = ["data"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-markers = ["llm: test requires a running Ollama server (deselect with -m 'not llm')"]
+markers = [
+    "llm: test requires a running Ollama server (deselect with -m 'not llm')",
+    "dataset: needs data/downloads/EVTX-ATTACK-SAMPLES (skips cleanly if missing)",
+]

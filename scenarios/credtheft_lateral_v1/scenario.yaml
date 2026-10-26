@@ -1,0 +1,211 @@
+scenario_id: credtheft_lateral_v1
+title: Credential theft and lateral movement (composite)
+description: Independent real EVTX captures stitched into one storyline by an alignment layer (time offsets
+  + host aliases), plus SYNTHETIC companion sources. Two real captures from unrelated incidents are decoys.
+dataset_provenance:
+  repo_url: https://github.com/sbousseaden/EVTX-ATTACK-SAMPLES
+  clone_commit: 4ceed2f4706daf601c212a8f91c113dd85349a2c
+  retrieved_at: '2026-10-26'
+  note: shallow clone (depth 1); license not verified (LICENSE.GPL present); raw files are never redistributed,
+    only hashes and metadata are committed
+seed: 20240312
+virtual_start_time: '2024-03-12T09:00:00Z'
+virtual_hosts:
+- hostname: WS-FIN-07
+  role: victim workstation (S1/S2)
+  ip: 10.20.1.7
+- hostname: SRV-FILE-02
+  role: lateral target (S3/S4)
+  ip: 10.20.2.2
+- hostname: DC-01
+  role: domain controller (S5)
+  ip: 10.20.0.1
+- hostname: WS-HR-03
+  role: decoy workstation (D1)
+  ip: 10.20.1.3
+- hostname: SRV-WEB-01
+  role: decoy web server (D2)
+  ip: 10.20.3.1
+noise:
+  benign_fs_entries_per_host: 400
+  benign_auth_lines_total: 800
+sources:
+- source_key: s1_lsass_mimikatz
+  kind: real_evtx
+  relative_path: Credential Access/sysmon_10_lsass_mimikatz_sekurlsa_logonpasswords.evtx
+  stage_id: S1
+  sha256: 9a1689574ed08c1fb18e7ff3f3bed612109aedcb7bf8efbf3537d756e669e96f
+  description: 'Sysmon 10: process access to lsass.exe by a Mimikatz binary'
+  is_synthetic: false
+- source_key: s2_pth_logon
+  kind: real_evtx
+  relative_path: Lateral Movement/LM_4624_mimikatz_sekurlsa_pth_source_machine.evtx
+  stage_id: S2
+  sha256: bbfd87cacdd56a9135de1838666937cd6c74daba47b366bba0c11f95ce97f461
+  description: Security log of the pass-the-hash source machine
+  is_synthetic: false
+- source_key: s3_psexec_smb
+  kind: real_evtx
+  relative_path: Lateral Movement/LM_sysmon_psexec_smb_meterpreter.evtx
+  stage_id: S3
+  sha256: 18ffdda9c24e593d6b1414b6e05c7f7a5dbffb8588a387c165431b61ab52d76f
+  description: 'Sysmon: remote service creation over SMB (PsExec-style, Meterpreter payload)'
+  is_synthetic: false
+- source_key: s4_renamed_psexec
+  kind: real_evtx
+  relative_path: Defense Evasion/DE_renamed_psexec_service_sysmon_17_18.evtx
+  stage_id: S4
+  sha256: 3b58311891bc80b239da102dec9c462d9c8d07c1f0ba5fedaf2c59e1e4447179
+  description: 'Sysmon 17/18: PsExec service renamed to svchost.exe'
+  is_synthetic: false
+- source_key: s5_dcsync
+  kind: real_evtx
+  relative_path: Credential Access/CA_DCSync_4662.evtx
+  stage_id: S5
+  sha256: 679b2ff27af6c932c07bf3e81391e455fae98e69bf3aff0f524e31aadc418131
+  description: 'Security 4662 on a domain controller: directory replication rights used'
+  is_synthetic: false
+- source_key: d1_winlogon_persist
+  kind: real_evtx
+  relative_path: Persistence/sysmon_13_1_persistence_via_winlogon_shell.evtx
+  stage_id: D1
+  sha256: 78592aa982a478d1a65f56853bdf3817a3d5c79db3b1ca64642e1a2e16064423
+  description: 'DECOY: unrelated incident, Winlogon Shell persistence (T1547.004)'
+  is_synthetic: false
+- source_key: d2_rundll32_lolbin
+  kind: real_evtx
+  relative_path: Execution/exec_sysmon_1_lolbin_rundll32_advpack_RegisterOCX.evtx
+  stage_id: D2
+  sha256: 6d5b52398a67b36c160ec22db8e027efbc3e40943075d2d79c748931bc8d9982
+  description: 'DECOY: unrelated incident, rundll32 advpack.dll proxy execution (T1218.011)'
+  is_synthetic: false
+- source_key: fs_ws_fin_07
+  kind: synthetic_file_timeline
+  relative_path: fs_ws_fin_07.csv
+  stage_id: null
+  sha256: null
+  description: SYNTHETIC synthetic_file_timeline for WS-FIN-07 (generated, not real telemetry)
+  is_synthetic: true
+- source_key: fs_srv_file_02
+  kind: synthetic_file_timeline
+  relative_path: fs_srv_file_02.csv
+  stage_id: null
+  sha256: null
+  description: SYNTHETIC synthetic_file_timeline for SRV-FILE-02 (generated, not real telemetry)
+  is_synthetic: true
+- source_key: fs_dc_01
+  kind: synthetic_file_timeline
+  relative_path: fs_dc_01.csv
+  stage_id: null
+  sha256: null
+  description: SYNTHETIC synthetic_file_timeline for DC-01 (generated, not real telemetry)
+  is_synthetic: true
+- source_key: auth_ws_fin_07
+  kind: synthetic_auth_log
+  relative_path: auth_ws_fin_07.log
+  stage_id: null
+  sha256: null
+  description: SYNTHETIC synthetic_auth_log for WS-FIN-07 (generated, not real telemetry)
+  is_synthetic: true
+- source_key: auth_srv_file_02
+  kind: synthetic_auth_log
+  relative_path: auth_srv_file_02.log
+  stage_id: null
+  sha256: null
+  description: SYNTHETIC synthetic_auth_log for SRV-FILE-02 (generated, not real telemetry)
+  is_synthetic: true
+- source_key: auth_dc_01
+  kind: synthetic_auth_log
+  relative_path: auth_dc_01.log
+  stage_id: null
+  sha256: null
+  description: SYNTHETIC synthetic_auth_log for DC-01 (generated, not real telemetry)
+  is_synthetic: true
+stages:
+- stage_id: S1
+  name: Credential theft
+  attack_technique_ids:
+  - T1003.001
+  description: Mimikatz reads LSASS memory on the victim workstation.
+  role: storyline
+- stage_id: S2
+  name: Use of stolen credential (pass-the-hash)
+  attack_technique_ids:
+  - T1550.002
+  description: A NewCredentials logon with the stolen secret.
+  role: storyline
+- stage_id: S3
+  name: Lateral movement
+  attack_technique_ids:
+  - T1021.002
+  - T1569.002
+  description: Remote service creation on the file server over SMB.
+  role: storyline
+- stage_id: S4
+  name: Defense evasion via renamed PsExec service
+  attack_technique_ids:
+  - T1036.003
+  - T1569.002
+  description: PsExec service binary disguised as svchost.exe.
+  role: storyline
+- stage_id: S5
+  name: Domain credential dump
+  attack_technique_ids:
+  - T1003.006
+  description: 'DCSync: replication rights abused against the DC.'
+  role: storyline
+- stage_id: D1
+  name: 'Decoy: Winlogon persistence'
+  attack_technique_ids:
+  - T1547.004
+  description: Unrelated incident on another host.
+  role: decoy
+- stage_id: D2
+  name: 'Decoy: rundll32 proxy execution'
+  attack_technique_ids:
+  - T1218.011
+  description: Unrelated incident on another host.
+  role: decoy
+alignment:
+- source_key: s1_lsass_mimikatz
+  real_first_key_event_time: '2019-03-17T19:37:11.661928Z'
+  virtual_first_key_event_time: '2024-03-12T09:00:00.661928Z'
+  time_offset_seconds: 157382569
+  host_aliases:
+    PC04.example.corp: WS-FIN-07
+- source_key: s2_pth_logon
+  real_first_key_event_time: '2019-03-18T11:06:29.911579Z'
+  virtual_first_key_event_time: '2024-03-12T09:25:00.911579Z'
+  time_offset_seconds: 157328311
+  host_aliases:
+    PC01.example.corp: WS-FIN-07
+- source_key: s3_psexec_smb
+  real_first_key_event_time: '2019-04-30T20:26:51.793589Z'
+  virtual_first_key_event_time: '2024-03-12T09:40:00.793589Z'
+  time_offset_seconds: 153580389
+  host_aliases:
+    IEWIN7: SRV-FILE-02
+- source_key: s4_renamed_psexec
+  real_first_key_event_time: '2020-09-27T13:42:00.726774Z'
+  virtual_first_key_event_time: '2024-03-12T09:55:00.726774Z'
+  time_offset_seconds: 109023180
+  host_aliases:
+    MSEDGEWIN10: SRV-FILE-02
+- source_key: s5_dcsync
+  real_first_key_event_time: '2019-05-08T02:10:43.487217Z'
+  virtual_first_key_event_time: '2024-03-12T10:35:00.487217Z'
+  time_offset_seconds: 152958257
+  host_aliases:
+    DC1.insecurebank.local: DC-01
+- source_key: d1_winlogon_persist
+  real_first_key_event_time: '2019-06-14T22:22:17.988371Z'
+  virtual_first_key_event_time: '2024-03-12T12:00:00.988371Z'
+  time_offset_seconds: 149693863
+  host_aliases:
+    IEWIN7: WS-HR-03
+- source_key: d2_rundll32_lolbin
+  real_first_key_event_time: '2019-05-12T14:18:03.589506Z'
+  virtual_first_key_event_time: '2024-03-12T14:00:00.589506Z'
+  time_offset_seconds: 152581317
+  host_aliases:
+    IEWIN7: SRV-WEB-01
