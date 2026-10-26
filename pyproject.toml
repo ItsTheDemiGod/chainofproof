@@ -18,6 +18,9 @@ dependencies = [
     "typer",
 ]
 
+[project.scripts]
+chainofproof = "chainofproof.cli:app"
+
 [project.optional-dependencies]
 dev = ["pytest", "ruff"]
 

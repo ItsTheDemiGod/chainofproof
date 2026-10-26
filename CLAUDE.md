@@ -32,7 +32,7 @@ Agents may all use the same local model with different prompts and different too
 
 ## Phases (update the status as we go)
 - Phase 0: Setup and CLAUDE.md [DONE]
-- Phase 1: Evidence ingestion and chain of custody [TODO]
+- Phase 1: Evidence ingestion and chain of custody [DONE]
 - Phase 2: Datasets and ground truth (answer keys) [TODO]
 - Phase 3: Forensic tool layer and normalized event format [TODO]
 - Phase 4: Evidence graph and contradiction detection [TODO]
@@ -60,6 +60,9 @@ Agents may all use the same local model with different prompts and different too
 - If something is ambiguous, make the most reasonable decision, record it in docs/decisions.md, and mention it in the summary instead of stopping, unless it is blocking.
 
 ## Environment notes
-- Windows 11, PowerShell, user demia. Project path: C:\Users\demia\chainofproof.
+- Windows 11, PowerShell, user demia. Project path: C:\Users\demia\Desktop\chainofproof.
 - Hardware: RTX 4060 8 GB VRAM. Keep prompts small, context around 8k tokens. Models: qwen2.5:7b-instruct (default) and llama3.1:8b via Ollama at http://localhost:11434.
+- Always run Python via .venv\Scripts\python.exe. The python on PATH is MSYS2 3.14 and must never be used. Tools such as Volatility 3 must be installed into the .venv and run through .venv\Scripts\python.exe.
+- "ollama run" defaults to a 4096-token context. Our code must always send num_ctx explicitly with every request and must log the context length actually loaded.
+- The project folder is NOT synced to OneDrive. Keep it that way; evidence stays local.
 - Plaso/WSL decision deferred to Phase 3. Volatility 3 and log tools run natively on Windows.

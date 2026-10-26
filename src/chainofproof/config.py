@@ -31,6 +31,33 @@ class PathSettings(BaseModel):
     scenarios: Path
 
 
+class Paths(BaseModel):
+    """All data folders used by the code; tests build one under tmp_path."""
+
+    base_dir: Path
+    evidence_raw: Path
+    evidence_working: Path
+    db_dir: Path
+    ledger_dir: Path
+    runs_dir: Path
+
+    @property
+    def db_path(self) -> Path:
+        """SQLite database file."""
+        return self.db_dir / "chainofproof.db"
+
+    @property
+    def ledger_path(self) -> Path:
+        """Append-only JSONL ledger file."""
+        return self.ledger_dir / "ledger.jsonl"
+
+    def ensure_dirs(self) -> None:
+        """Create all data folders if missing."""
+        for p in (self.evidence_raw, self.evidence_working, self.db_dir, self.ledger_dir):
+            p.mkdir(parents=True, exist_ok=True)
+        self.runs_dir.mkdir(parents=True, exist_ok=True)
+
+
 class CloudSettings(BaseModel):
     enabled: bool = False
     provider: str = "none"
@@ -63,3 +90,31 @@ def load_settings(path: Path = SETTINGS_PATH, env_path: Path | None = None) -> S
         p = getattr(s.paths, name)
         setattr(s.paths, name, p if p.is_absolute() else s.project_root / p)
     return s
+
+
+def get_paths(settings: Settings | None = None, base_dir: Path | None = None) -> Paths:
+    """Build a Paths object from an explicit base_dir (tests) or from settings.yaml.
+
+    With base_dir, the standard layout (evidence_raw, evidence_working, db, ledger, runs)
+    is created under it, so the real data/ folder is never touched.
+    """
+    if base_dir is not None:
+        b = Path(base_dir).resolve()
+        return Paths(
+            base_dir=b,
+            evidence_raw=b / "evidence_raw",
+            evidence_working=b / "evidence_working",
+            db_dir=b / "db",
+            ledger_dir=b / "ledger",
+            runs_dir=b / "runs",
+        )
+    s = settings or load_settings()
+    p = s.paths
+    return Paths(
+        base_dir=p.evidence_raw.parent,
+        evidence_raw=p.evidence_raw,
+        evidence_working=p.evidence_working,
+        db_dir=p.db,
+        ledger_dir=p.ledger,
+        runs_dir=p.runs,
+    )
