@@ -1,0 +1,18 @@
+.venv/
+__pycache__/
+.env
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+tools_bin/
+
+# Evidence is large and sensitive; keep only the folder skeleton (.gitkeep)
+data/**
+!data/**/
+!data/**/.gitkeep
+*.raw
+*.mem
+*.vmem
+*.E01
+*.pcap
+*.evtx

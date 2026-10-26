@@ -1,0 +1,20 @@
+ollama:
+  host: http://localhost:11434
+  default_model: qwen2.5:7b-instruct
+  secondary_model: llama3.1:8b
+  temperature: 0
+  num_ctx: 8192
+  seed: 42
+
+# Relative to the project root
+paths:
+  evidence_raw: data/evidence_raw
+  evidence_working: data/evidence_working
+  db: data/db
+  ledger: data/ledger
+  runs: data/runs
+  scenarios: scenarios
+
+optional_cloud:
+  enabled: false
+  provider: none
