@@ -13,8 +13,9 @@ import random
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-from chainofproof.scenarios.companions import FS_COLUMNS, MARKER, fmt_ts
+from chainofproof.scenarios.companions import FS_COLUMNS, MARKER, Pairing, fmt_ts
 from chainofproof.scenarios.gen_context import GenContext
+from chainofproof.scenarios.keyevents_base import base
 
 SYSTEM_NAMES = [
     "kernel32",
@@ -72,6 +73,7 @@ class FsResult:
 
     rows: list[dict[str, str]]
     artifacts: dict[str, int]
+    pairings: dict[str, Pairing]  # tag -> how the artifact relates to real evidence
 
 
 def _row(path: str, size: int, c: datetime, m: datetime, a: datetime, ch: datetime) -> dict:
@@ -111,28 +113,58 @@ def _benign(ctx: GenContext, host: str, rng: random.Random) -> list[dict[str, st
     return rows
 
 
-def _attacker(ctx: GenContext, host: str, rng: random.Random) -> dict[str, dict[str, str]]:
-    """Attacker artifacts for this host, keyed by tag; times come from real key events."""
-    out: dict[str, dict[str, str]] = {}
-    if host == "WS-FIN-07":
-        ev, t1 = ctx.first_key("S1")
-        exe = ev.facts.get("SourceImage", r"C:\Users\Public\mimikatz.exe")
-        folder = exe.rsplit("\\", 1)[0]
-        c = t1 - timedelta(seconds=180)
-        out["mimikatz"] = _row(exe, 1_355_680, c, c, t1 - timedelta(seconds=60), c)
-        d = t1 + timedelta(seconds=4)
-        out["creds_dump"] = _row(rf"{folder}\sekurlsa_out.txt", 18_342, d, d, d, d)
-    elif host == "SRV-FILE-02":
-        _, t3 = ctx.first_key("S3", event_id=13)
-        out["psexesvc"] = _row(
-            r"C:\Windows\PSEXESVC.exe", 381_328, t3, t3, t3 + timedelta(seconds=1), t3
-        )
-        _, t4 = ctx.first_key("S4", supports="T1036.003")
-        c = t4 - timedelta(seconds=3)
-        out["renamed_svchost"] = _row(
-            r"C:\Windows\svchost.exe", 381_328, c, c, t4, c
-        )  # same size as PsExec's service binary
+Attacker = dict[str, tuple[dict[str, str], Pairing]]
+
+
+def _marked(row: dict[str, str], pairing: Pairing) -> tuple[dict[str, str], Pairing]:
+    """Write the pairing marker (rule R1) into the row's ``note`` column."""
+    row["note"] = pairing.marker()
+    return row, pairing
+
+
+def _attacker_ws(ctx: GenContext) -> Attacker:
+    ev, t1 = ctx.first_key("S1")
+    exe = ev.facts.get("SourceImage", r"C:\Users\Public\mimikatz.exe")
+    folder = exe.rsplit("\\", 1)[0]
+    pr, _, _ = ctx.pairing("S1", "image_basename", base(exe), ("SourceImage",), by_basename=True)
+    c = t1 - timedelta(seconds=180)
+    d = t1 + timedelta(seconds=4)
+    return {
+        "mimikatz": _marked(_row(exe, 1_355_680, c, c, t1 - timedelta(seconds=60), c), pr),
+        # the real S1 file shows no file write: a labelled supplement, not evidence
+        "creds_dump": _marked(
+            _row(rf"{folder}\sekurlsa_out.txt", 18_342, d, d, d, d), Pairing(synthetic_only=True)
+        ),
+    }
+
+
+def _attacker_srv(ctx: GenContext, rng: random.Random) -> Attacker:
+    """SRV-FILE-02: S3 shows only a PowerShell stager; PsExec artifacts belong to S4 (R2/R3)."""
+    pr, _, t3 = ctx.pairing(
+        "S3", "image_basename", "powershell.exe", ("Image",), event_id=1, by_basename=True
+    )
+    pf = f"C:\\Windows\\Prefetch\\POWERSHELL.EXE-{rng.getrandbits(32):08X}.pf"
+    out = {"ps_prefetch": _marked(_row(pf, 63_244, t3, t3, t3, t3), pr)}
+    pr, masq, t4 = ctx.pairing(
+        "S4", "image_basename", "svchost.exe", ("Image",), event_id=17, by_basename=True
+    )
+    c = t4 - timedelta(seconds=3)
+    out["renamed_svchost"] = _marked(_row(masq.facts["Image"], 381_328, c, c, t4, c), pr)
+    pr, client, _ = ctx.pairing(
+        "S4", "image_basename", "psexec.exe", ("Image",), event_id=18, by_basename=True
+    )
+    c = t4 - timedelta(seconds=12)  # the client must exist before its first use
+    out["psexec_client"] = _marked(_row(client.facts["Image"], 833_024, c, c, t4, c), pr)
     return out
+
+
+def _attacker(ctx: GenContext, host: str, rng: random.Random) -> Attacker:
+    """Attacker artifacts for this host, keyed by tag; times come from real key events."""
+    if host == "WS-FIN-07":
+        return _attacker_ws(ctx)
+    if host == "SRV-FILE-02":
+        return _attacker_srv(ctx, rng)
+    return {}
 
 
 def generate_fs(ctx: GenContext, host: str) -> FsResult:
@@ -140,12 +172,12 @@ def generate_fs(ctx: GenContext, host: str) -> FsResult:
     rng = ctx.rng(f"fs:{host}")
     atk = _attacker(ctx, host, rng)
     rows = _benign(ctx, host, rng)
-    rows += atk.values()
+    rows += [r for r, _ in atk.values()]
     rows.sort(key=lambda r: r["path"].lower())
     for i, r in enumerate(rows, 1):
         r["record_id"], r["host"] = str(i), host
-    ids = {tag: int(r["record_id"]) for tag, r in atk.items()}
-    return FsResult(rows, ids)
+    ids = {tag: int(r["record_id"]) for tag, (r, _) in atk.items()}
+    return FsResult(rows, ids, {tag: p for tag, (_, p) in atk.items()})
 
 
 def render_fs(ctx: GenContext, rows: list[dict[str, str]]) -> str:

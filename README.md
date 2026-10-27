@@ -6,7 +6,7 @@ where every claim cites evidence IDs. Fully local (Ollama), free, reproducible.
 See `CLAUDE.md` for principles, architecture and phases.
 
 ## Status
-Phases 0 (setup) and 1 (evidence ingestion and chain of custody) done. Next: Phase 2 (datasets and ground truth).
+Phases 0 to 2 and 2.1 (synthetic/real alignment, key completion, detectability oracles) done. Next: Phase 3 (forensic tool layer).
 
 ## Setup (Windows, PowerShell)
 ```powershell
@@ -40,7 +40,7 @@ Set `CHAINOFPROOF_BASE_DIR` to use a throwaway data root instead of `data/`.
 | `scenario-keys SCENARIO_ID` | (re)write `key_clean.yaml` / `key_perturbed.yaml` |
 | `scenario-generate SCENARIO_ID clean\|perturbed [--force]` | write the SYNTHETIC companion files |
 | `scenario-build SCENARIO_ID clean\|perturbed [--force]` | verify dataset hashes, generate, create case `<id>_<variant>`, ingest everything |
-| `scenario-verify SCENARIO_ID` | dataset hashes, alignment, keys, generator determinism (exit 0/1) |
+| `scenario-verify SCENARIO_ID` | dataset hashes, alignment, keys, generator determinism, adjudication list (exit 0/1) |
 | `scenario-key-show SCENARIO_ID clean\|perturbed` | answer key as tables |
 
 Datasets live in `data/downloads/` (gitignored); see `docs/scenarios.md`.

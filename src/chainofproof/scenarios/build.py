@@ -20,6 +20,7 @@ from chainofproof.scenarios.dataset import (
     scenarios_root,
     verify_dataset,
 )
+from chainofproof.scenarios.fieldscan import load_known_events
 from chainofproof.scenarios.gen_context import REAL_FMT, parse_real
 from chainofproof.scenarios.generator import GenResult, generate_variant
 from chainofproof.scenarios.inventory import (
@@ -28,7 +29,9 @@ from chainofproof.scenarios.inventory import (
     run_inventory,
     save_inventory,
 )
+from chainofproof.scenarios.keyevents import APPENDED
 from chainofproof.scenarios.keys import build_key
+from chainofproof.schemas.adjudication import load_adjudication
 from chainofproof.schemas.scenario import (
     AnswerKey,
     Scenario,
@@ -60,7 +63,8 @@ def list_scenarios() -> list[tuple[str, str, str]]:
     for f in sorted(scenarios_root().glob("*/scenario.yaml")):
         sc = load_scenario(f)
         have = [v.value for v, name in KEY_FILES.items() if (f.parent / name).is_file()]
-        out.append((sc.scenario_id, sc.title, ", ".join(have) or "(no keys yet)"))
+        title = sc.title + (f" [supersedes {sc.supersedes}]" if sc.supersedes else "")
+        out.append((sc.scenario_id, title, ", ".join(have) or "(no keys yet)"))
     return out
 
 
@@ -87,8 +91,11 @@ def check_alignment(scenario: Scenario, inv: Inventory) -> list[str]:
         if virt != a.virtual_first_key_event_time:
             problems.append(f"{a.source_key}: virtual time != real time + offset")
         st = next((k for k in inv.key_events if k.source_key == a.source_key), None)
-        if st is not None and not st.result.unresolved:
-            first = min(e.real_time for e in st.result.events)
+        anchors = (
+            [e.real_time for e in st.result.events if set(e.supports) - APPENDED] if st else []
+        )
+        if anchors:
+            first = min(anchors)
             if first != a.real_first_key_event_time:
                 problems.append(f"{a.source_key}: alignment anchor differs from first key event")
     return problems
@@ -142,8 +149,12 @@ def build_case(
     gen_dir, _ = generate(paths, scenario_id, variant, force)
     case_id = f"{scenario_id}_{variant.value}"
     store = EvidenceStore(paths)
-    if store.get_case(case_id) is None:
-        store.create_case(case_id, scenario.title, f"{scenario.scenario_id} ({variant.value})")
+    label = f"{scenario.scenario_id} ({variant.value})"
+    existing = store.get_case(case_id)
+    if existing is None:
+        store.create_case(case_id, scenario.title, label)
+    elif existing.description != label:  # never mix evidence of different scenario revisions
+        raise ScenarioError(f"case {case_id} exists but was created for another scenario")
     items = []
     for s in scenario.sources:
         real = s.kind == SourceKind.real_evtx
@@ -167,6 +178,7 @@ def verify_scenario(paths: Paths, scenario_id: str) -> list[str]:
     scenario, inv = load_all(scenario_id)
     problems = verify_dataset(scenario, dataset_root(paths))
     problems += check_alignment(scenario, inv)
+    keys: list[AnswerKey] = []
     for variant in Variant:
         kf = d / KEY_FILES[variant]
         if not kf.is_file():
@@ -177,8 +189,21 @@ def verify_scenario(paths: Paths, scenario_id: str) -> list[str]:
         except ScenarioError as e:
             problems.append(str(e))
             continue
+        keys.append(key)
         problems += _check_determinism(scenario, inv, variant, key)
-    return problems
+    return problems + _check_adjudication(d, scenario, keys)
+
+
+def _check_adjudication(d: Path, scenario: Scenario, keys: list[AnswerKey]) -> list[str]:
+    """adjudication.yaml must exist and agree with the scenario, the keys and the inspection."""
+    adj, insp = d / "adjudication.yaml", d / "field_inspection.json"
+    if not adj.is_file() or not insp.is_file():
+        return ["adjudication.yaml / field_inspection.json: missing"]
+    try:
+        load_adjudication(adj, scenario, keys, load_known_events(insp))
+    except (ScenarioError, ValueError, KeyError) as e:
+        return [str(e)]
+    return []
 
 
 def _check_determinism(

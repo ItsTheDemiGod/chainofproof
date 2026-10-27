@@ -143,7 +143,9 @@ def register(app: typer.Typer, handled: Callable[..., Any], out: Console, err: C
         """Check dataset hashes, alignment, key validity and generator determinism (exit 0/1)."""
         problems = build.verify_scenario(paths_of(ctx), scenario_id)
         if not problems:
-            out.print(f"scenario {scenario_id}: OK (dataset hashes, keys, determinism)")
+            out.print(
+                f"scenario {scenario_id}: OK (hashes, alignment, keys, determinism, adjudication)"
+            )
             return
         err.print(f"[red]scenario {scenario_id}: FAILED[/red]", highlight=False)
         for p in problems:

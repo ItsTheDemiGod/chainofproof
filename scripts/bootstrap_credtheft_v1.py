@@ -3,6 +3,7 @@
 Kept for provenance. It hashes the chosen real files, runs the key-event rules, and derives the
 alignment layer (time offsets) from the discovered key events. Run with .venv\\Scripts\\python.exe.
 Re-running overwrites scenario.yaml; the committed file is the source of truth afterwards.
+HISTORICAL: v1 was superseded by credtheft_lateral_v2 (see docs/decisions.md); do not re-run.
 """
 
 from __future__ import annotations

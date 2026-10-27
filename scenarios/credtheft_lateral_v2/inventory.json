@@ -1,5 +1,5 @@
 {
-  "scenario_id": "credtheft_lateral_v1",
+  "scenario_id": "credtheft_lateral_v2",
   "dataset_commit": "4ceed2f4706daf601c212a8f91c113dd85349a2c",
   "sources": [
     {
@@ -255,7 +255,8 @@
         "technique_confidence": {
           "T1003.001": "high"
         },
-        "note": ""
+        "note": "",
+        "technique_notes": {}
       }
     },
     {
@@ -291,12 +292,29 @@
               "SubjectUserName": "user01",
               "SubjectLogonId": "0x0000000004530f0f"
             }
+          },
+          {
+            "record_id": 432901,
+            "event_id": 1102,
+            "channel": "Security",
+            "real_time": "2019-03-18T11:06:25.485214Z",
+            "rationale": "EventID 1102 (Security audit log cleared) shortly before the 4624",
+            "supports": [
+              "T1070.001"
+            ],
+            "facts": {
+              "SubjectUserName": "user01"
+            }
           }
         ],
         "technique_confidence": {
-          "T1550.002": "medium"
+          "T1550.002": "medium",
+          "T1070.001": "medium"
         },
-        "note": "LogonType 9 'seclogo' is also produced by legitimate runas /netonly, so the logon alone does not prove a stolen hash; hence medium"
+        "note": "LogonType 9 'seclogo' is also produced by legitimate runas /netonly, so the logon alone does not prove a stolen hash; hence medium",
+        "technique_notes": {
+          "T1070.001": "the clear may instead be lab preparation by the dataset author before recording; it is treated as a defense-evasion indicator inside this constructed storyline"
+        }
       }
     },
     {
@@ -309,7 +327,7 @@
             "event_id": 18,
             "channel": "Microsoft-Windows-Sysmon/Operational",
             "real_time": "2019-04-30T20:26:51.793589Z",
-            "rationale": "EventID 18, PipeName=ntsvcs (remote service control over SMB)",
+            "rationale": "EventID 18, PipeName=ntsvcs opened by the System process (SMB server side)",
             "supports": [
               "T1021.002"
             ],
@@ -319,11 +337,40 @@
             }
           },
           {
+            "record_id": 9811,
+            "event_id": 3,
+            "channel": "Microsoft-Windows-Sysmon/Operational",
+            "real_time": "2019-04-30T20:26:53.152962Z",
+            "rationale": "EventID 3, Image=System, Initiated=False, SourcePort=445 (inbound SMB)",
+            "supports": [
+              "T1021.002"
+            ],
+            "facts": {
+              "Image": "System",
+              "Initiated": "False",
+              "SourcePort": "445",
+              "Protocol": "tcp"
+            }
+          },
+          {
+            "record_id": 9805,
+            "event_id": 13,
+            "channel": "Microsoft-Windows-Sysmon/Operational",
+            "real_time": "2019-04-30T20:26:51.949839Z",
+            "rationale": "EventID 13, TargetObject under \\services\\ written by services.exe",
+            "supports": [
+              "T1569.002"
+            ],
+            "facts": {
+              "TargetObject": "HKLM\\System\\CurrentControlSet\\services\\hello\\Start"
+            }
+          },
+          {
             "record_id": 9806,
             "event_id": 13,
             "channel": "Microsoft-Windows-Sysmon/Operational",
             "real_time": "2019-04-30T20:26:51.981089Z",
-            "rationale": "EventID 13, TargetObject ends \\ImagePath under \\services\\, Image=services.exe",
+            "rationale": "EventID 13, TargetObject under \\services\\ written by services.exe",
             "supports": [
               "T1569.002"
             ],
@@ -336,12 +383,43 @@
             "event_id": 1,
             "channel": "Microsoft-Windows-Sysmon/Operational",
             "real_time": "2019-04-30T20:26:52.090464Z",
-            "rationale": "EventID 1, ParentImage=services.exe, Image, User",
+            "rationale": "EventID 1, shell/PowerShell process chain started by the new service",
             "supports": [
               "T1569.002"
             ],
             "facts": {
               "Image": "C:\\Windows\\System32\\cmd.exe",
+              "ParentImage": "C:\\Windows\\System32\\services.exe",
+              "User": "NT AUTHORITY\\SYSTEM"
+            }
+          },
+          {
+            "record_id": 9808,
+            "event_id": 1,
+            "channel": "Microsoft-Windows-Sysmon/Operational",
+            "real_time": "2019-04-30T20:26:52.106089Z",
+            "rationale": "EventID 1, shell/PowerShell process chain started by the new service",
+            "supports": [
+              "T1569.002"
+            ],
+            "facts": {
+              "Image": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+              "ParentImage": "C:\\Windows\\System32\\cmd.exe",
+              "User": "NT AUTHORITY\\SYSTEM"
+            }
+          },
+          {
+            "record_id": 9809,
+            "event_id": 1,
+            "channel": "Microsoft-Windows-Sysmon/Operational",
+            "real_time": "2019-04-30T20:26:52.356089Z",
+            "rationale": "EventID 1, shell/PowerShell process chain started by the new service",
+            "supports": [
+              "T1569.002"
+            ],
+            "facts": {
+              "Image": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+              "ParentImage": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
               "User": "NT AUTHORITY\\SYSTEM"
             }
           }
@@ -350,7 +428,11 @@
           "T1021.002": "medium",
           "T1569.002": "medium"
         },
-        "note": "no network logon (4624/5140) or ADMIN$ file copy in this file: the SMB link rests on the ntsvcs pipe only; the service is not PsExec itself (the binary is not visible)"
+        "note": "",
+        "technique_notes": {
+          "T1021.002": "no network logon (4624/5140) and no ADMIN$ file copy in this file: the SMB link rests on the System-process ntsvcs pipe open and the inbound TCP 445 connection; who connected and with which credential is not shown",
+          "T1569.002": "the service runs a command line (cmd.exe -> powershell.exe), not PsExec itself; no PsExec artifact is visible in this file"
+        }
       }
     },
     {
@@ -386,6 +468,32 @@
             }
           },
           {
+            "record_id": 409648,
+            "event_id": 17,
+            "channel": "Microsoft-Windows-Sysmon/Operational",
+            "real_time": "2020-09-27T13:42:01.093184Z",
+            "rationale": "EventID 17, PipeName matches <name>-<host>-<pid>-stdin/out/err",
+            "supports": [
+              "T1569.002"
+            ],
+            "facts": {
+              "PipeName": "\\svchost-MSEDGEWIN10-8116-stdout"
+            }
+          },
+          {
+            "record_id": 409649,
+            "event_id": 17,
+            "channel": "Microsoft-Windows-Sysmon/Operational",
+            "real_time": "2020-09-27T13:42:01.093922Z",
+            "rationale": "EventID 17, PipeName matches <name>-<host>-<pid>-stdin/out/err",
+            "supports": [
+              "T1569.002"
+            ],
+            "facts": {
+              "PipeName": "\\svchost-MSEDGEWIN10-8116-stderr"
+            }
+          },
+          {
             "record_id": 409650,
             "event_id": 18,
             "channel": "Microsoft-Windows-Sysmon/Operational",
@@ -398,13 +506,42 @@
               "Image": "C:\\Windows\\system32\\PsExec.exe",
               "PipeName": "\\svchost-MSEDGEWIN10-8116-stdin"
             }
+          },
+          {
+            "record_id": 409651,
+            "event_id": 18,
+            "channel": "Microsoft-Windows-Sysmon/Operational",
+            "real_time": "2020-09-27T13:42:01.182880Z",
+            "rationale": "EventID 18, Image=PsExec.exe connects the PsExec-style pipe",
+            "supports": [
+              "T1569.002"
+            ],
+            "facts": {
+              "Image": "C:\\Windows\\system32\\PsExec.exe",
+              "PipeName": "\\svchost-MSEDGEWIN10-8116-stdout"
+            }
+          },
+          {
+            "record_id": 409652,
+            "event_id": 18,
+            "channel": "Microsoft-Windows-Sysmon/Operational",
+            "real_time": "2020-09-27T13:42:01.182989Z",
+            "rationale": "EventID 18, Image=PsExec.exe connects the PsExec-style pipe",
+            "supports": [
+              "T1569.002"
+            ],
+            "facts": {
+              "Image": "C:\\Windows\\system32\\PsExec.exe",
+              "PipeName": "\\svchost-MSEDGEWIN10-8116-stderr"
+            }
           }
         ],
         "technique_confidence": {
           "T1036.003": "medium",
           "T1569.002": "high"
         },
-        "note": "the rename is inferred from the image path; no file hash or PE name"
+        "note": "the rename is inferred from the image path; no file hash or PE name",
+        "technique_notes": {}
       }
     },
     {
@@ -458,7 +595,8 @@
         "technique_confidence": {
           "T1003.006": "high"
         },
-        "note": "subject is a user account (not a DC machine account); source host of the request is not in this file"
+        "note": "subject is a user account (not a DC machine account); source host of the request is not in this file",
+        "technique_notes": {}
       }
     }
   ]

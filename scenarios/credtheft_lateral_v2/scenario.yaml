@@ -1,7 +1,12 @@
-scenario_id: credtheft_lateral_v1
+scenario_id: credtheft_lateral_v2
 title: Credential theft and lateral movement (composite)
 description: Independent real EVTX captures stitched into one storyline by an alignment layer (time offsets
-  + host aliases), plus SYNTHETIC companion sources. Two real captures from unrelated incidents are decoys.
+  + host aliases), plus SYNTHETIC companion sources that are paired with real events or marked synthetic-only.
+  Two real captures from unrelated incidents are decoys.
+supersedes: credtheft_lateral_v1
+supersedes_reason: v1 synthetic companions put PsExec artifacts and an SMB admin-share line at stage S3, which
+  the real S3 file (a PowerShell stager started by a new service, no network logon, no ADMIN$ copy) does not
+  show; the keys also missed the real Security 1102 event and the P2 clock-skew pairing was undefined.
 dataset_provenance:
   repo_url: https://github.com/sbousseaden/EVTX-ATTACK-SAMPLES
   clone_commit: 4ceed2f4706daf601c212a8f91c113dd85349a2c
@@ -49,7 +54,8 @@ sources:
   relative_path: Lateral Movement/LM_sysmon_psexec_smb_meterpreter.evtx
   stage_id: S3
   sha256: 18ffdda9c24e593d6b1414b6e05c7f7a5dbffb8588a387c165431b61ab52d76f
-  description: 'Sysmon: remote service creation over SMB (PsExec-style, Meterpreter payload)'
+  description: 'Sysmon: new service launching a hidden PowerShell chain with an inbound SMB connection (dataset
+    file name says psexec_smb_meterpreter; no PsExec binary is visible)'
   is_synthetic: false
 - source_key: s4_renamed_psexec
   kind: real_evtx
@@ -131,15 +137,17 @@ stages:
 - stage_id: S2
   name: Use of stolen credential (pass-the-hash)
   attack_technique_ids:
+  - T1070.001
   - T1550.002
-  description: A NewCredentials logon with the stolen secret.
+  description: A NewCredentials logon with the stolen secret, shortly after the Security log was cleared.
   role: storyline
 - stage_id: S3
-  name: Lateral movement
+  name: Remote service execution (PowerShell stager)
   attack_technique_ids:
   - T1021.002
   - T1569.002
-  description: Remote service creation on the file server over SMB.
+  description: A new service on the file server launches a hidden PowerShell chain; an inbound SMB connection
+    and the ntsvcs pipe are visible, but no network logon and no admin-share copy.
   role: storyline
 - stage_id: S4
   name: Defense evasion via renamed PsExec service

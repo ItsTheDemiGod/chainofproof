@@ -9,6 +9,7 @@ from __future__ import annotations
 import csv
 import io
 import re
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -37,6 +38,45 @@ _AUTH_REQUIRED = ("seq", "ts", "host", "event")
 
 class CompanionParseError(UserError):
     """A companion file line is malformed."""
+
+
+@dataclass(frozen=True)
+class Pairing:
+    """How a synthetic attacker record relates to real evidence (rule R1).
+
+    Either paired (a real field/value shared with real event(s)) or ``synthetic_only``. The
+    marker below is written into the generated file and read back by the parsers.
+    """
+
+    field: str | None = None
+    value: str | None = None
+    source_key: str | None = None  # real source holding the paired event(s)
+    record_ids: tuple[int, ...] = ()
+    synthetic_only: bool = False
+
+    def marker(self) -> str:
+        """``pair=<field>:<value>`` or ``synth_only=1`` (no spaces, no commas)."""
+        return "synth_only=1" if self.synthetic_only else f"pair={self.field}:{self.value}"
+
+
+def parse_marker(text: str) -> tuple[str, str] | bool | None:
+    """Read a marker: ``(field, value)`` if paired, ``True`` if synthetic_only, else ``None``."""
+    if text == "synth_only=1":
+        return True
+    if text.startswith("pair="):
+        field_name, sep, value = text[5:].partition(":")
+        if sep and field_name and value:
+            return field_name, value
+    return None
+
+
+def row_marker(row: dict[str, str]) -> tuple[str, str] | bool | None:
+    """Marker of a parsed fs row (``note`` column) or auth line (``pair`` / ``synth_only`` keys)."""
+    if "note" in row:
+        return parse_marker(row["note"])
+    if row.get("synth_only") == "1":
+        return True
+    return parse_marker(f"pair={row['pair']}") if "pair" in row else None
 
 
 def parse_ts(value: str) -> datetime:

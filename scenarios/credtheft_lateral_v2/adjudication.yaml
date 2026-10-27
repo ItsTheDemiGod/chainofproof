@@ -1,0 +1,88 @@
+scenario_id: credtheft_lateral_v2
+policy: 'A finding produced by an agent that is NOT in the answer key is scored by this list. Listed as true_finding:
+  counts as a true positive. Listed as not_attack: counts as a false positive. Listed as unclear: reported separately
+  and excluded from precision and recall. Not listed at all: counted as an unlisted finding, reported separately for
+  manual review.'
+entries:
+- id: GT-ADJ-001
+  source_key: s2_pth_logon
+  event_record_id: 432905
+  event_id: 4688
+  verdict: unclear
+  reason: 'Security 4688 process creation (cmd.exe) in the same instant as the new-credentials logon, subject is the
+    machine account. Plausibly the process started with the stolen secret, but 4688 is not in the key and the real
+    file does not link it to the 4624 by logon id.'
+  decided_by: claude-code-draft, pending human review
+- id: GT-ADJ-002
+  source_key: s2_pth_logon
+  event_record_id: 432906
+  event_id: 4688
+  verdict: unclear
+  reason: 'Security 4688 conhost.exe, a console host that accompanies any cmd.exe; attacker-related only through the
+    cmd.exe above.'
+  decided_by: claude-code-draft, pending human review
+- id: GT-ADJ-003
+  source_key: s2_pth_logon
+  event_record_id: 433078
+  event_id: 4688
+  verdict: unclear
+  reason: 'Security 4688 dllhost.exe about 17 s after the logon; could be benign background activity of the lab host
+    or follow-on activity.'
+  decided_by: claude-code-draft, pending human review
+- id: GT-ADJ-004
+  source_key: s3_psexec_smb
+  event_record_id: 9810
+  event_id: 10
+  verdict: unclear
+  reason: 'Sysmon 10 process access powershell.exe to powershell.exe right after the stager started: consistent with
+    in-process migration or injection, but the access mask and call trace are not used to decide; could also be
+    ordinary parent/child handle use.'
+  decided_by: claude-code-draft, pending human review
+- id: GT-ADJ-005
+  source_key: s3_psexec_smb
+  event_record_id: 9812
+  event_id: 13
+  verdict: unclear
+  reason: 'Second Sysmon 13 write of the Start value of the same new service about 1.3 s after the first command ran:
+    may be service clean-up or reconfiguration, direction not shown.'
+  decided_by: claude-code-draft, pending human review
+- id: GT-ADJ-006
+  source_key: s3_psexec_smb
+  event_record_id: 9813
+  event_id: 3
+  verdict: unclear
+  reason: 'Sysmon 3 outbound TCP connection to port 4444 from the hidden powershell.exe running as SYSTEM, 2 s after
+    the stager started. Very likely command-and-control traffic (4444 is a common default), but no ATT&CK technique
+    is assigned in the key and the destination is not otherwise known.'
+  decided_by: claude-code-draft, pending human review
+- id: GT-ADJ-007
+  source_key: s4_renamed_psexec
+  event_record_id: 409646
+  event_id: 18
+  verdict: unclear
+  reason: 'Sysmon 18 where the System process connects the main pipe of the renamed service; the System image is the
+    SMB server side, so this may show a remote or loopback SMB client, but the origin is not shown.'
+  decided_by: claude-code-draft, pending human review
+- id: GT-ADJ-008
+  source_key: s4_renamed_psexec
+  event_record_id: 409653
+  event_id: 18
+  verdict: unclear
+  reason: 'Sysmon 18 where the renamed svchost.exe connects the lsass pipe about 14 s after start: could be the
+    session authenticating or a command run through it; which one is not shown.'
+  decided_by: claude-code-draft, pending human review
+- id: GT-ADJ-009
+  source_key: s4_renamed_psexec
+  event_record_id: 409654
+  event_id: 18
+  verdict: not_attack
+  reason: 'Sysmon 18 mmc.exe connecting the wkssvc pipe: routine behaviour of the Management Console; no
+    attacker-specific marker. Could be the dataset author inspecting the host (lab artefact).'
+  decided_by: claude-code-draft, pending human review
+- id: GT-ADJ-010
+  source_key: s4_renamed_psexec
+  event_record_id: 409655
+  event_id: 18
+  verdict: not_attack
+  reason: 'Sysmon 18 mmc.exe connecting the browser pipe: same reasoning as the wkssvc event.'
+  decided_by: claude-code-draft, pending human review

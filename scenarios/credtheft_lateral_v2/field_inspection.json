@@ -1,0 +1,432 @@
+{
+  "note": "metadata only; see docs/scenarios.md",
+  "scenario_id": "credtheft_lateral_v2",
+  "sources": {
+    "d1_winlogon_persist": {
+      "event_id_counts": {
+        "1": 19,
+        "11": 1,
+        "13": 1,
+        "5": 2,
+        "7": 2
+      },
+      "noteworthy_counts": {
+        "Sysmon": {
+          "1": 19,
+          "11": 1,
+          "13": 1,
+          "7": 2
+        }
+      },
+      "record_count": 25,
+      "sha256": "78592aa982a478d1a65f56853bdf3817a3d5c79db3b1ca64642e1a2e16064423",
+      "stage_id": "D1"
+    },
+    "d2_rundll32_lolbin": {
+      "event_id_counts": {
+        "1": 2
+      },
+      "noteworthy_counts": {
+        "Sysmon": {
+          "1": 2
+        }
+      },
+      "record_count": 2,
+      "sha256": "6d5b52398a67b36c160ec22db8e027efbc3e40943075d2d79c748931bc8d9982",
+      "stage_id": "D2"
+    },
+    "s1_lsass_mimikatz": {
+      "event_id_counts": {
+        "10": 1
+      },
+      "events": [
+        {
+          "channel": "Sysmon",
+          "computer": "PC04.example.corp",
+          "event_id": 10,
+          "record_id": 4807,
+          "source_image": "mimikatz.exe",
+          "target_image": "lsass.exe",
+          "time": "2019-03-17T19:37:11.661928Z"
+        }
+      ],
+      "noteworthy_counts": {
+        "Sysmon": {
+          "10": 1
+        }
+      },
+      "record_count": 1,
+      "sha256": "9a1689574ed08c1fb18e7ff3f3bed612109aedcb7bf8efbf3537d756e669e96f",
+      "stage_id": "S1"
+    },
+    "s2_pth_logon": {
+      "event_id_counts": {
+        "1102": 1,
+        "4624": 1,
+        "4672": 1,
+        "4688": 3
+      },
+      "events": [
+        {
+          "account": "user01",
+          "channel": "Security",
+          "computer": "PC01.example.corp",
+          "event_id": 1102,
+          "record_id": 432901,
+          "time": "2019-03-18T11:06:25.485214Z"
+        },
+        {
+          "account": "user01",
+          "auth_package": "Negotiate",
+          "channel": "Security",
+          "computer": "PC01.example.corp",
+          "event_id": 4624,
+          "logon_process": "seclogo",
+          "logon_type": "9",
+          "record_id": 432903,
+          "time": "2019-03-18T11:06:29.911579Z"
+        },
+        {
+          "account": "user01",
+          "channel": "Security",
+          "computer": "PC01.example.corp",
+          "event_id": 4672,
+          "record_id": 432904,
+          "time": "2019-03-18T11:06:29.911579Z"
+        },
+        {
+          "account": "PC01$",
+          "channel": "Security",
+          "computer": "PC01.example.corp",
+          "event_id": 4688,
+          "image": "cmd.exe",
+          "record_id": 432905,
+          "time": "2019-03-18T11:06:29.911579Z"
+        },
+        {
+          "account": "PC01$",
+          "channel": "Security",
+          "computer": "PC01.example.corp",
+          "event_id": 4688,
+          "image": "conhost.exe",
+          "record_id": 432906,
+          "time": "2019-03-18T11:06:29.961651Z"
+        },
+        {
+          "account": "PC01$",
+          "channel": "Security",
+          "computer": "PC01.example.corp",
+          "event_id": 4688,
+          "image": "dllhost.exe",
+          "record_id": 433078,
+          "time": "2019-03-18T11:06:46.305151Z"
+        }
+      ],
+      "noteworthy_counts": {
+        "Security": {
+          "1102": 1,
+          "4672": 1
+        }
+      },
+      "record_count": 6,
+      "sha256": "bbfd87cacdd56a9135de1838666937cd6c74daba47b366bba0c11f95ce97f461",
+      "stage_id": "S2"
+    },
+    "s3_psexec_smb": {
+      "event_id_counts": {
+        "1": 3,
+        "10": 1,
+        "13": 3,
+        "18": 1,
+        "3": 2
+      },
+      "events": [
+        {
+          "channel": "Sysmon",
+          "computer": "IEWIN7",
+          "event_id": 18,
+          "image": "System",
+          "pipe_name": "\\ntsvcs",
+          "record_id": 9804,
+          "time": "2019-04-30T20:26:51.793589Z"
+        },
+        {
+          "channel": "Sysmon",
+          "computer": "IEWIN7",
+          "event_id": 13,
+          "image": "services.exe",
+          "record_id": 9805,
+          "registry_key": "HKLM\\System\\CurrentControlSet\\services\\hello\\Start",
+          "time": "2019-04-30T20:26:51.949839Z"
+        },
+        {
+          "channel": "Sysmon",
+          "computer": "IEWIN7",
+          "event_id": 13,
+          "image": "services.exe",
+          "record_id": 9806,
+          "registry_key": "HKLM\\System\\CurrentControlSet\\services\\hello\\ImagePath",
+          "time": "2019-04-30T20:26:51.981089Z"
+        },
+        {
+          "account": "NT AUTHORITY\\SYSTEM",
+          "channel": "Sysmon",
+          "command_line": {
+            "encoded_command_switch": false,
+            "hidden_window": true,
+            "length": 2438,
+            "mentions_powershell": true,
+            "no_profile": true
+          },
+          "computer": "IEWIN7",
+          "event_id": 1,
+          "image": "cmd.exe",
+          "parent_image": "services.exe",
+          "record_id": 9807,
+          "time": "2019-04-30T20:26:52.090464Z"
+        },
+        {
+          "account": "NT AUTHORITY\\SYSTEM",
+          "channel": "Sysmon",
+          "command_line": {
+            "encoded_command_switch": false,
+            "hidden_window": true,
+            "length": 2391,
+            "mentions_powershell": true,
+            "no_profile": true
+          },
+          "computer": "IEWIN7",
+          "event_id": 1,
+          "image": "powershell.exe",
+          "parent_image": "cmd.exe",
+          "record_id": 9808,
+          "time": "2019-04-30T20:26:52.106089Z"
+        },
+        {
+          "account": "NT AUTHORITY\\SYSTEM",
+          "channel": "Sysmon",
+          "command_line": {
+            "encoded_command_switch": false,
+            "hidden_window": true,
+            "length": 2018,
+            "mentions_powershell": true,
+            "no_profile": true
+          },
+          "computer": "IEWIN7",
+          "event_id": 1,
+          "image": "powershell.exe",
+          "parent_image": "powershell.exe",
+          "record_id": 9809,
+          "time": "2019-04-30T20:26:52.356089Z"
+        },
+        {
+          "channel": "Sysmon",
+          "computer": "IEWIN7",
+          "event_id": 10,
+          "record_id": 9810,
+          "source_image": "powershell.exe",
+          "target_image": "powershell.exe",
+          "time": "2019-04-30T20:26:52.371714Z"
+        },
+        {
+          "account": "NT AUTHORITY\\SYSTEM",
+          "channel": "Sysmon",
+          "computer": "IEWIN7",
+          "destination_port": "33801",
+          "event_id": 3,
+          "image": "System",
+          "initiated": "False",
+          "protocol": "tcp",
+          "record_id": 9811,
+          "source_port": "445",
+          "time": "2019-04-30T20:26:53.152962Z"
+        },
+        {
+          "channel": "Sysmon",
+          "computer": "IEWIN7",
+          "event_id": 13,
+          "image": "services.exe",
+          "record_id": 9812,
+          "registry_key": "HKLM\\System\\CurrentControlSet\\services\\hello\\Start",
+          "time": "2019-04-30T20:26:53.199839Z"
+        },
+        {
+          "account": "NT AUTHORITY\\SYSTEM",
+          "channel": "Sysmon",
+          "computer": "IEWIN7",
+          "destination_port": "4444",
+          "event_id": 3,
+          "image": "powershell.exe",
+          "initiated": "True",
+          "protocol": "tcp",
+          "record_id": 9813,
+          "source_port": "49160",
+          "time": "2019-04-30T20:26:54.152962Z"
+        }
+      ],
+      "noteworthy_counts": {
+        "Sysmon": {
+          "1": 3,
+          "10": 1,
+          "13": 3,
+          "18": 1,
+          "3": 2
+        }
+      },
+      "record_count": 10,
+      "sha256": "18ffdda9c24e593d6b1414b6e05c7f7a5dbffb8588a387c165431b61ab52d76f",
+      "stage_id": "S3"
+    },
+    "s4_renamed_psexec": {
+      "event_id_counts": {
+        "17": 4,
+        "18": 7
+      },
+      "events": [
+        {
+          "channel": "Sysmon",
+          "computer": "MSEDGEWIN10",
+          "event_id": 17,
+          "image": "svchost.exe",
+          "pipe_name": "\\svchost",
+          "record_id": 409645,
+          "time": "2020-09-27T13:42:00.726774Z"
+        },
+        {
+          "channel": "Sysmon",
+          "computer": "MSEDGEWIN10",
+          "event_id": 18,
+          "image": "System",
+          "pipe_name": "\\svchost",
+          "record_id": 409646,
+          "time": "2020-09-27T13:42:00.969110Z"
+        },
+        {
+          "channel": "Sysmon",
+          "computer": "MSEDGEWIN10",
+          "event_id": 17,
+          "image": "svchost.exe",
+          "pipe_name": "\\svchost-MSEDGEWIN10-8116-stdin",
+          "record_id": 409647,
+          "time": "2020-09-27T13:42:01.092665Z"
+        },
+        {
+          "channel": "Sysmon",
+          "computer": "MSEDGEWIN10",
+          "event_id": 17,
+          "image": "svchost.exe",
+          "pipe_name": "\\svchost-MSEDGEWIN10-8116-stdout",
+          "record_id": 409648,
+          "time": "2020-09-27T13:42:01.093184Z"
+        },
+        {
+          "channel": "Sysmon",
+          "computer": "MSEDGEWIN10",
+          "event_id": 17,
+          "image": "svchost.exe",
+          "pipe_name": "\\svchost-MSEDGEWIN10-8116-stderr",
+          "record_id": 409649,
+          "time": "2020-09-27T13:42:01.093922Z"
+        },
+        {
+          "channel": "Sysmon",
+          "computer": "MSEDGEWIN10",
+          "event_id": 18,
+          "image": "PsExec.exe",
+          "pipe_name": "\\svchost-MSEDGEWIN10-8116-stdin",
+          "record_id": 409650,
+          "time": "2020-09-27T13:42:01.182772Z"
+        },
+        {
+          "channel": "Sysmon",
+          "computer": "MSEDGEWIN10",
+          "event_id": 18,
+          "image": "PsExec.exe",
+          "pipe_name": "\\svchost-MSEDGEWIN10-8116-stdout",
+          "record_id": 409651,
+          "time": "2020-09-27T13:42:01.182880Z"
+        },
+        {
+          "channel": "Sysmon",
+          "computer": "MSEDGEWIN10",
+          "event_id": 18,
+          "image": "PsExec.exe",
+          "pipe_name": "\\svchost-MSEDGEWIN10-8116-stderr",
+          "record_id": 409652,
+          "time": "2020-09-27T13:42:01.182989Z"
+        },
+        {
+          "channel": "Sysmon",
+          "computer": "MSEDGEWIN10",
+          "event_id": 18,
+          "image": "svchost.exe",
+          "pipe_name": "\\lsass",
+          "record_id": 409653,
+          "time": "2020-09-27T13:42:15.033194Z"
+        },
+        {
+          "channel": "Sysmon",
+          "computer": "MSEDGEWIN10",
+          "event_id": 18,
+          "image": "mmc.exe",
+          "pipe_name": "\\wkssvc",
+          "record_id": 409654,
+          "time": "2020-09-27T13:42:15.525845Z"
+        },
+        {
+          "channel": "Sysmon",
+          "computer": "MSEDGEWIN10",
+          "event_id": 18,
+          "image": "mmc.exe",
+          "pipe_name": "\\browser",
+          "record_id": 409655,
+          "time": "2020-09-27T13:42:15.530783Z"
+        }
+      ],
+      "noteworthy_counts": {
+        "Sysmon": {
+          "17": 4,
+          "18": 7
+        }
+      },
+      "record_count": 11,
+      "sha256": "3b58311891bc80b239da102dec9c462d9c8d07c1f0ba5fedaf2c59e1e4447179",
+      "stage_id": "S4"
+    },
+    "s5_dcsync": {
+      "event_id_counts": {
+        "4662": 3
+      },
+      "events": [
+        {
+          "account": "Administrator",
+          "channel": "Security",
+          "computer": "DC1.insecurebank.local",
+          "event_id": 4662,
+          "record_id": 202791,
+          "time": "2019-05-08T02:10:43.487217Z"
+        },
+        {
+          "account": "Administrator",
+          "channel": "Security",
+          "computer": "DC1.insecurebank.local",
+          "event_id": 4662,
+          "record_id": 202792,
+          "time": "2019-05-08T02:10:43.487217Z"
+        },
+        {
+          "account": "Administrator",
+          "channel": "Security",
+          "computer": "DC1.insecurebank.local",
+          "event_id": 4662,
+          "record_id": 202793,
+          "time": "2019-05-08T02:10:43.487217Z"
+        }
+      ],
+      "noteworthy_counts": {},
+      "record_count": 3,
+      "sha256": "679b2ff27af6c932c07bf3e81391e455fae98e69bf3aff0f524e31aadc418131",
+      "stage_id": "S5"
+    }
+  }
+}

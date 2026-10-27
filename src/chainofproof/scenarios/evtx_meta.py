@@ -68,6 +68,10 @@ def parse_event_xml(xml: str) -> EvtxEvent:
     if ed is not None:
         for i, d in enumerate(ed):
             data[d.get("Name") or f"_{i}"] = d.text or ""
+    ud = root.find(f"{NS}UserData")
+    if ud is not None and len(ud):  # e.g. 1102: UserData/LogFileCleared/<fields>
+        for el in list(ud[0]):
+            data[el.tag.rsplit("}", 1)[-1]] = el.text or ""
     return EvtxEvent(
         record_id=int(txt("EventRecordID")),
         event_id=int(txt("EventID")),

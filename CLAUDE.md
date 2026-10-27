@@ -34,6 +34,7 @@ Agents may all use the same local model with different prompts and different too
 - Phase 0: Setup and CLAUDE.md [DONE]
 - Phase 1: Evidence ingestion and chain of custody [DONE]
 - Phase 2: Datasets and ground truth (answer keys) [DONE]
+- Phase 2.1: Synthetic/real alignment and key completion [DONE]
 - Phase 3: Forensic tool layer and normalized event format [TODO]
 - Phase 4: Evidence graph and contradiction detection [TODO]
 - Phase 5: Agent core (LLM client, planner loop, citation verifier) [TODO]
@@ -60,6 +61,7 @@ Agents may all use the same local model with different prompts and different too
 - Before installing heavy dependencies or downloading large files, ask me first.
 - Never delete anything under data/. Never modify original evidence files.
 - At the end of every phase: run all tests and lint, write docs/phase_reports/phase_N.md (what was built, how to run it, tests passing, decisions made, open issues), update the phase status in this file, make a git commit with message "Phase N: <short summary>", and print a concise summary for me.
+- Synthetic records may never assert what the paired real evidence does not show; detectable_by claims must be backed by a test.
 - If something is ambiguous, make the most reasonable decision, record it in docs/decisions.md, and mention it in the summary instead of stopping, unless it is blocking.
 
 ## Environment notes

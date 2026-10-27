@@ -70,7 +70,9 @@ def test_files_carry_synthetic_marker(gens):
 def _artifact_rows(d, res):
     rows = {r["record_id"]: r for r in parse_fs_csv(d / "fs_srv_file_02.csv")}
     return [
-        rows[str(i)] for t, (_, i) in res.fs_ids.items() if t in ("psexesvc", "renamed_svchost")
+        rows[str(i)]
+        for t, (_, i) in res.fs_ids.items()
+        if t in ("renamed_svchost", "psexec_client")
     ]
 
 
@@ -110,17 +112,23 @@ def test_p2_skew_measured(gens):
         ).read_bytes()
 
 
-def test_p2_matches_real_event_time(fx, gens):
+def test_p2_paired_lines_match_real_event_times(fx, gens):
     scn, inv = fx
     ctx = GenContext(scn, inv)
-    _, t = ctx.first_key("S3", event_id=18)
+    want = {
+        e.facts["PipeName"].lstrip("\\"): ctx.virt("s4", e.real_time)
+        for e in inv.keys_for("S4").result.events
+        if e.event_id == 18
+    }
 
-    def smb(v):
+    def paired(v):
         rows = parse_auth_log(gens[v][0] / "auth_srv_file_02.log")
-        return next(r for r in rows if r["event"] == "SMB_ADMIN_SHARE_CONNECT")
+        return {r["pipe"]: parse_ts(r["ts"]) for r in rows if r["event"] == "NAMED_PIPE_OPEN"}
 
-    assert parse_ts(smb(Variant.clean)["ts"]) == t
-    assert (parse_ts(smb(Variant.perturbed)["ts"]) - t).total_seconds() == 420
+    assert set(paired(Variant.clean)) == set(want) and len(want) == 3
+    for pipe, t in want.items():
+        assert paired(Variant.clean)[pipe] == t
+        assert (paired(Variant.perturbed)[pipe] - t).total_seconds() == 420
 
 
 def test_p3_gap_measured(gens):

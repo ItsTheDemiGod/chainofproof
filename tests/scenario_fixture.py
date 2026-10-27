@@ -6,6 +6,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from chainofproof.custody.hashing import sha256_file
+from chainofproof.scenarios.fieldscan import save_inspection
 from chainofproof.scenarios.inventory import (
     Inventory,
     SourceInventory,
@@ -13,6 +14,7 @@ from chainofproof.scenarios.inventory import (
     save_inventory,
 )
 from chainofproof.scenarios.keyevents import KeyEvent, StageResult
+from chainofproof.schemas.adjudication import POLICY, Adjudication, save_adjudication
 from chainofproof.schemas.scenario import (
     AlignmentEntry,
     Confidence,
@@ -40,6 +42,9 @@ STAGES = [
 ]
 
 
+PIPES = ("stdin", "stdout", "stderr")
+
+
 def _ke(rid: int, eid: int, t: str, supports: list[str], **facts: str) -> KeyEvent:
     return KeyEvent(rid, eid, "Chan", t, "fixture", supports, facts)
 
@@ -59,10 +64,46 @@ def _keys() -> dict[str, list[KeyEvent]]:
                 TargetUserName="user01",
                 LogonType="9",
                 TargetLogonId="0x0000000004530f0f",
-            )
+            ),
+            _ke(20, 1102, "2019-03-18T11:06:25.000000Z", ["T1070.001"], SubjectUserName="user01"),
         ],
-        "S3": [_ke(31, 18, t["S3"], ["T1021.002"]), _ke(32, 13, t["S3"], ["T1569.002"])],
-        "S4": [_ke(41, 17, t["S4"], ["T1036.003"]), _ke(42, 18, t["S4"], ["T1569.002"])],
+        "S3": [
+            _ke(31, 18, t["S3"], ["T1021.002"], PipeName=r"\ntsvcs", Image="System"),
+            _ke(32, 13, t["S3"], ["T1569.002"], TargetObject=r"HKLM\x\services\hello\ImagePath"),
+            _ke(33, 1, t["S3"], ["T1569.002"], Image=r"C:\Windows\System32\cmd.exe"),
+            _ke(
+                34,
+                1,
+                t["S3"],
+                ["T1569.002"],
+                Image=r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+            ),
+        ],
+        "S4": [
+            _ke(
+                41,
+                17,
+                t["S4"],
+                ["T1036.003"],
+                Image=r"C:\Windows\svchost.exe",
+                PipeName=r"\svchost",
+            ),
+            *[
+                _ke(42 + i, 17, t["S4"], ["T1569.002"], PipeName=rf"\svchost-H-9-{n}")
+                for i, n in enumerate(PIPES)
+            ],
+            *[
+                _ke(
+                    45 + i,
+                    18,
+                    t["S4"],
+                    ["T1569.002"],
+                    Image=r"C:\Windows\System32\PsExec.exe",
+                    PipeName=rf"\svchost-H-9-{n}",
+                )
+                for i, n in enumerate(PIPES)
+            ],
+        ],
         "S5": [
             _ke(
                 51,
@@ -234,4 +275,8 @@ def build_fixture(root: Path, seed: int = 7) -> tuple[Scenario, Inventory, Path,
     )
     save_scenario(sdir / "scenario.yaml", scn)
     save_inventory(sdir / "inventory.json", inv)
+    save_adjudication(
+        sdir / "adjudication.yaml", Adjudication(scenario_id=SID, policy=POLICY, entries=[])
+    )
+    save_inspection(sdir / "field_inspection.json", {"scenario_id": SID, "sources": {}})
     return scn, inv, root / "scenarios", ddir

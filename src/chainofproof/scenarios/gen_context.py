@@ -6,8 +6,10 @@ import random
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
+from chainofproof.scenarios.companions import Pairing
 from chainofproof.scenarios.inventory import Inventory
 from chainofproof.scenarios.keyevents import KeyEvent
+from chainofproof.scenarios.keyevents_base import base
 from chainofproof.schemas.scenario import Scenario, ScenarioError
 
 REAL_FMT = "%Y-%m-%dT%H:%M:%S.%fZ"
@@ -39,6 +41,46 @@ class GenContext:
         """Real event time -> virtual time through the alignment layer (whole seconds)."""
         off = self.scenario.aligned(source_key).time_offset_seconds
         return (parse_real(real_time) + timedelta(seconds=off)).replace(microsecond=0)
+
+    def pairing(
+        self,
+        stage_id: str,
+        field: str,
+        value: str,
+        facts: tuple[str, ...],
+        event_id: int | None = None,
+        by_basename: bool = False,
+    ) -> tuple[Pairing, KeyEvent, datetime]:
+        """Pair a synthetic record with the real key events of a stage that share ``value``.
+
+        Matches (case-insensitive) the named facts of the stage's key events, optionally as path
+        basenames. Returns the Pairing (all matching record ids), the first match and its virtual
+        time. Raises ScenarioError if no real event matches: a pairing must be real.
+        """
+        sk = self.inventory.keys_for(stage_id)
+        want = value.lower()
+
+        def hit(e: KeyEvent) -> bool:
+            for f in facts:
+                v = e.facts.get(f, "")
+                if (base(v) if by_basename else v.lstrip("\\").lower()) == want:
+                    return True
+            return False
+
+        found = [e for e in sk.result.events if hit(e) and event_id in (None, e.event_id)]
+        if not found:
+            raise ScenarioError(f"stage {stage_id}: no real event shares {field}={value!r}")
+        ids = tuple(sorted({e.record_id for e in found}))
+        pr = Pairing(field, value, sk.source_key, ids)
+        return pr, found[0], self.virt(sk.source_key, found[0].real_time)
+
+    def key_time(self, source_key: str, record_id: int) -> datetime:
+        """Virtual (aligned) time of a real key event, whole seconds."""
+        for sk in self.inventory.key_events:
+            for e in sk.result.events:
+                if sk.source_key == source_key and e.record_id == record_id:
+                    return self.virt(source_key, e.real_time)
+        raise ScenarioError(f"{source_key}: record {record_id} is not a key event")
 
     def first_key(
         self, stage_id: str, event_id: int | None = None, supports: str | None = None
