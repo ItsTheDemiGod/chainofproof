@@ -28,6 +28,7 @@ detectors:
     min_abs_delta_seconds: 2.0     # sources have 1 s resolution; below 2 s is rounding noise
     min_independent_pairs: 2       # one pair can be a coincidence; two agreeing pairs are a pattern
     agreement_seconds: 1.0         # pairs agree when they differ by at most the 1 s resolution
+    pair_window_seconds: 900       # pipe-name pairs: typical clock errors are well below 15 minutes
   log_gap:
     max_other_events_listed: 10    # listing cap only, not a detection threshold
   log_clear:

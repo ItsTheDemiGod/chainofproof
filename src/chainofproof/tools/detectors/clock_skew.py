@@ -1,9 +1,11 @@
 """clock_skew: two sources disagree about when the SAME thing happened.
 
 Pairs are discovered from SHARED FIELDS only: the same ``conn_id`` (two ends of a connection) or
-the same pipe name (leading backslashes ignored) in events of different evidence sources. For each
-shared key and pair of sources the closest pair of events is used, on timestamps truncated to whole
-seconds (the coarsest source has 1 s resolution). Per source, pairs that agree within
+the same pipe name (leading backslashes ignored) in events of different evidence sources, on
+timestamps truncated to whole seconds (the coarsest source has 1 s resolution). For a conn_id the
+closest pair of events is used. A pipe name repeats all day, so pipe pairs must be on the same
+virtual host, at most ``pair_window_seconds`` apart, and matched one-to-one by nearest time (an
+event is in at most one pair). Per source, pairs that agree within
 ``agreement_seconds`` form a consistent offset; it is reported when at least
 ``min_independent_pairs`` agree and they involve 2+ partner sources or 2+ shared keys.
 
@@ -75,21 +77,45 @@ def discover_pairs(events: Iterable[NormalizedEvent], params: ClockSkewParams) -
         labels = sorted(by_label)
         for i, la in enumerate(labels):
             for lb in labels[i + 1 :]:
-                best = None
-                for ea in by_label[la]:
-                    for eb in by_label[lb]:
-                        ta, tb = _sec(ea.timestamp), _sec(eb.timestamp)
-                        if ta is None or tb is None:
-                            continue
-                        d = int((tb - ta).total_seconds())
-                        cand = (abs(d), ea.event_uid, eb.event_uid, d, ea, eb)
-                        best = min(best, cand, key=lambda c: c[:3]) if best else cand
-                if best and best[0] >= params.min_abs_delta_seconds:
-                    _, _, _, d, ea, eb = best
-                    pairs.append(
-                        Pair(kind, key, la, lb, ea.event_uid, eb.event_uid, ea.host, eb.host, d)
-                    )
+                cands = _candidates(kind, by_label[la], by_label[lb], params)
+                for _, _, _, d, ea, eb in _chosen(kind, cands):
+                    if abs(d) >= params.min_abs_delta_seconds:
+                        pairs.append(Pair(kind, key, la, lb, ea.event_uid, eb.event_uid,
+                                          ea.host, eb.host, d))  # fmt: skip
     return pairs
+
+
+def _candidates(kind: str, evs_a: list, evs_b: list, params: ClockSkewParams) -> list[tuple]:
+    """(|d|, uid_a, uid_b, d, a, b) for every event pair that may be the same thing.
+
+    conn_id is unique per connection, so every combination counts. A pipe name is NOT unique
+    (ordinary names repeat all day on every host), so a pipe pair must be on the same virtual host
+    and within ``pair_window_seconds``.
+    """
+    out = []
+    for ea in evs_a:
+        for eb in evs_b:
+            ta, tb = _sec(ea.timestamp), _sec(eb.timestamp)
+            if ta is None or tb is None:
+                continue
+            d = int((tb - ta).total_seconds())
+            if kind == "pipe_name" and (ea.host != eb.host or abs(d) > params.pair_window_seconds):
+                continue
+            out.append((abs(d), ea.event_uid, eb.event_uid, d, ea, eb))
+    return sorted(out, key=lambda c: c[:3])
+
+
+def _chosen(kind: str, cands: list[tuple]) -> list[tuple]:
+    """conn_id: the single closest pair. Pipe name: one-to-one nearest-time matching."""
+    if kind != "pipe_name":
+        return cands[:1]
+    used: set[str] = set()
+    out = []
+    for c in cands:
+        if c[1] not in used and c[2] not in used:
+            used.update((c[1], c[2]))
+            out.append(c)
+    return out
 
 
 def _clusters(obs: list[tuple[int, int]], agreement: float) -> list[list[tuple[int, int]]]:

@@ -20,7 +20,7 @@ from chainofproof.scenarios.dataset import (
     scenarios_root,
     verify_dataset,
 )
-from chainofproof.scenarios.fieldscan import load_known_events
+from chainofproof.scenarios.fieldscan import load_known_events, load_real_pipes
 from chainofproof.scenarios.gen_context import REAL_FMT, parse_real
 from chainofproof.scenarios.generator import GenResult, generate_variant
 from chainofproof.scenarios.inventory import (
@@ -30,7 +30,7 @@ from chainofproof.scenarios.inventory import (
     save_inventory,
 )
 from chainofproof.scenarios.keyevents import APPENDED
-from chainofproof.scenarios.keylinks import check_link_refs
+from chainofproof.scenarios.keylinks import check_collateral, check_link_refs
 from chainofproof.scenarios.keys import build_key
 from chainofproof.schemas.adjudication import load_adjudication
 from chainofproof.schemas.scenario import (
@@ -56,6 +56,11 @@ def load_all(scenario_id: str) -> tuple[Scenario, Inventory]:
     if not inv.is_file():
         raise ScenarioError(f"{scenario_id}: inventory.json missing; run scenario-inventory first")
     return load_scenario(d / "scenario.yaml"), load_inventory(inv)
+
+
+def real_pipes(scenario_id: str, scenario: Scenario) -> dict[str, frozenset[str]]:
+    """Pipe names of the real events per virtual host (generator guard for benign pipe lines)."""
+    return load_real_pipes(scenario_dir(scenario_id) / "field_inspection.json", scenario)
 
 
 def list_scenarios() -> list[tuple[str, str, str]]:
@@ -114,16 +119,17 @@ def generate(
         stale = [r for r, h in known.items() if (out / r).is_file() and sha256_file(out / r) != h]
         if stale:
             raise ScenarioError(f"generated files differ from the key: {stale}; use --force")
-    return out, generate_variant(scenario, inv, variant, out)
+    return out, generate_variant(scenario, inv, variant, out, real_pipes(scenario_id, scenario))
 
 
 def write_keys(scenario_id: str) -> list[Path]:
     """(Re)write key_clean.yaml and key_perturbed.yaml from a fresh generator run."""
     scenario, inv = load_all(scenario_id)
     written = []
+    pipes = real_pipes(scenario_id, scenario)
     for variant in Variant:
         with tempfile.TemporaryDirectory(prefix="cop_keys_") as tmp:
-            gen = generate_variant(scenario, inv, variant, Path(tmp))
+            gen = generate_variant(scenario, inv, variant, Path(tmp), pipes)
         path = scenario_dir(scenario_id) / KEY_FILES[variant]
         save_key(path, build_key(scenario, inv, variant, gen))
         written.append(path)
@@ -179,6 +185,7 @@ def verify_scenario(paths: Paths, scenario_id: str) -> list[str]:
     scenario, inv = load_all(scenario_id)
     problems = verify_dataset(scenario, dataset_root(paths))
     problems += check_alignment(scenario, inv)
+    pipes = real_pipes(scenario_id, scenario)
     keys: list[AnswerKey] = []
     for variant in Variant:
         kf = d / KEY_FILES[variant]
@@ -191,8 +198,21 @@ def verify_scenario(paths: Paths, scenario_id: str) -> list[str]:
             problems.append(str(e))
             continue
         keys.append(key)
-        problems += _check_determinism(scenario, inv, variant, key)
+        problems += _check_determinism(scenario, inv, variant, key, pipes)
+        if variant == Variant.perturbed:
+            problems += _check_collateral(scenario, inv, key, pipes)
     return problems + _check_adjudication(d, scenario, keys)
+
+
+def _check_collateral(
+    scenario: Scenario, inv: Inventory, key: AnswerKey, pipes: dict[str, frozenset[str]]
+) -> list[str]:
+    """The key's expected collateral must match both generated variants exactly."""
+    with tempfile.TemporaryDirectory(prefix="cop_coll_") as tmp:
+        dirs = {v: Path(tmp) / v.value for v in Variant}
+        for v, folder in dirs.items():
+            generate_variant(scenario, inv, v, folder, pipes)
+        return check_collateral(key, scenario, dirs[Variant.clean], dirs[Variant.perturbed])
 
 
 def _check_adjudication(d: Path, scenario: Scenario, keys: list[AnswerKey]) -> list[str]:
@@ -208,10 +228,14 @@ def _check_adjudication(d: Path, scenario: Scenario, keys: list[AnswerKey]) -> l
 
 
 def _check_determinism(
-    scenario: Scenario, inv: Inventory, variant: Variant, key: AnswerKey
+    scenario: Scenario,
+    inv: Inventory,
+    variant: Variant,
+    key: AnswerKey,
+    pipes: dict[str, frozenset[str]],
 ) -> list[str]:
     with tempfile.TemporaryDirectory(prefix="cop_verify_") as tmp:
-        gen = generate_variant(scenario, inv, variant, Path(tmp))
+        gen = generate_variant(scenario, inv, variant, Path(tmp), pipes)
         links_bad = check_link_refs(key, scenario, inv, Path(tmp))
     out = links_bad + [
         f"{variant.value}/{rel}: hash differs from key"

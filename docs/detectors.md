@@ -20,6 +20,7 @@ uids, measures), so the same data always yields the same keys.
 | clock_skew.min_abs_delta_seconds | 2.0 | the sources have 1 s resolution; under 2 s is rounding noise |
 | clock_skew.min_independent_pairs | 2 | one pair can be a coincidence; two agreeing pairs are a pattern |
 | clock_skew.agreement_seconds | 1.0 | pairs agree when they differ by at most the 1 s resolution |
+| clock_skew.pair_window_seconds | 900 | pipe-name pairs only (Phase 4.1 guard): typical clock errors are well below 15 minutes |
 | log_gap.max_other_events_listed | 10 | listing cap only, not a detection threshold |
 | log_clear.window_seconds | 60 | "immediately after": one minute of follow-on activity |
 
@@ -31,8 +32,14 @@ uids, measures), so the same data always yields the same keys.
   inside one record; it makes no cross-source claim.
 * **clock_skew** (`source_offset`, `pair_time_offset`): pairs are found from SHARED FIELDS only: the
   same `conn_id` or the same pipe name (leading backslashes ignored, case-insensitive) in events of
-  different sources. Per shared key and pair of sources the closest events are used, on timestamps
-  truncated to whole seconds (the coarsest source has 1 s resolution). A source is reported as
+  different sources, on timestamps truncated to whole seconds (the coarsest source has 1 s
+  resolution). For a `conn_id` (unique per connection) the closest events are used. **Pairing guard
+  for pipe names (Phase 4.1):** realistic benign data repeats ordinary pipe names (`spoolss`,
+  `srvsvc`...) all day on every host, which would pair unrelated events. Pipe pairs must therefore
+  be on the SAME virtual host, at most `pair_window_seconds` apart, and are matched one-to-one by
+  nearest time (an event is in at most one pair). This is a precision guard needed by the realistic
+  benign data, not a threshold tuned for a score: `min_abs_delta_seconds`, `min_independent_pairs`
+  and `agreement_seconds` were NOT changed, and `conn_id` pairing is untouched. A source is reported as
   consistently late/early when at least 2 pairs agree within 1 s and they involve 2+ partner sources
   or 2+ shared keys. A wrong clock is wrong against every partner while the partner only mirrors it,
   so candidates are ranked by number of partners, then pairs, and a candidate whose pairs a better
@@ -48,7 +55,10 @@ uids, measures), so the same data always yields the same keys.
 * **unmatched_connection** (`missing_counterpart`): a `conn_id` with only a source end (`CONN_OUT`) or
   only a destination end (`CONN_ACCEPTED` / `LOGON_SUCCESS`). If the host that should hold the
   missing end has a `sequence_gap` whose interval contains the present end's time, that gap's
-  `hit_key` is named as a possible explanation (generic rule).
+  `hit_key` is named as a possible explanation (generic rule). With benign connection pairs in the
+  data (v4), the same rule also reports every benign connection whose other end fell into a log gap
+  (collateral of the gap, each naming the gap hit); the evaluation lists these as "explained
+  collateral".
 
 ## Severity table (fixed)
 

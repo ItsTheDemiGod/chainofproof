@@ -15,7 +15,7 @@ from chainofproof.tools.hayabusa import run_hayabusa
 from chainofproof.tools.hayabusa_fp import locate_exe
 from leakage import scan
 
-SID = "credtheft_lateral_v3"
+SID = "credtheft_lateral_v4"
 pytestmark = pytest.mark.dataset
 
 

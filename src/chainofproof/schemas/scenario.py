@@ -128,7 +128,8 @@ class NoiseConfig(StrictModel):
     """Benign-noise knobs for the synthetic companions (in the scenario so hashes are stable)."""
 
     benign_fs_entries_per_host: int = Field(default=400, ge=0)
-    benign_auth_lines_total: int = Field(default=800, ge=0)
+    benign_auth_lines_total: int = Field(default=800, ge=0)  # standalone (non-connection) lines
+    benign_connection_pairs: int = Field(default=90, ge=0)  # complete benign cross-host pairs
 
 
 class Provenance(StrictModel):

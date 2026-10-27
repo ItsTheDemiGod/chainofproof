@@ -78,6 +78,7 @@ class ClockSkewParams(BaseModel):
     min_abs_delta_seconds: float = 2.0
     min_independent_pairs: int = 2
     agreement_seconds: float = 1.0
+    pair_window_seconds: float = 900.0
 
 
 class LogGapParams(BaseModel):

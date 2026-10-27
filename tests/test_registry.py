@@ -16,7 +16,7 @@ from chainofproof.tools.registry import (
     export_schemas,
 )
 
-PERT = "credtheft_lateral_v3_perturbed"
+PERT = "credtheft_lateral_v4_perturbed"
 QUERY = {"list_evidence_labels", "search_events", "get_event", "timeline_window", "source_summary"}
 GRAPH = {"graph_stats", "entity_summary", "neighbors", "find_paths", "host_links"}
 DETS = {f"detect_{n}" for n in DETECTORS}

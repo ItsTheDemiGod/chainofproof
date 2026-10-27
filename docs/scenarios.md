@@ -1,16 +1,19 @@
 # Scenarios and ground truth
 
-Scenario `credtheft_lateral_v3` (supersedes `credtheft_lateral_v2`, which superseded
-`credtheft_lateral_v1`): credential theft, pass-the-hash, a PowerShell stager launched by a new
-service, a renamed PsExec service and a DCSync, built from real EVTX captures plus **synthetic**
-companion files. Definition, inventory, field inspection, adjudication list and answer keys live in
-`scenarios/credtheft_lateral_v3/` (committed).
+Scenario `credtheft_lateral_v4` (supersedes `credtheft_lateral_v3`, which superseded
+`credtheft_lateral_v2`, which superseded `credtheft_lateral_v1`): credential theft, pass-the-hash,
+a PowerShell stager launched by a new service, a renamed PsExec service and a DCSync, built from
+real EVTX captures plus **synthetic** companion files. Definition, inventory, field inspection,
+adjudication list and answer keys live in `scenarios/credtheft_lateral_v4/` (committed).
 
-**Why v3 (Phase 2.2).** v2 tied nothing across hosts. v3 adds two labeled synthetic connections, a
-link ground truth (GT-LNK) and two extra detection checks; see "Cross-host links" below. The v1 and
-v2 cases (`credtheft_lateral_v1_*`, `credtheft_lateral_v2_*`) stay in the vault and ledger as
-SUPERSEDED history (append-only); `scenario-build` refuses a case created for another scenario id.
-The numbers in the sections below are those of v3.
+**Why v4 (Phase 4.1).** The Phase 4 style audit showed that lines named by the answer key could be
+told apart from benign synthetic lines by generator habits. v4 rebuilds the benign background; see
+"Scenario v4" below. The v1, v2 and v3 cases (`credtheft_lateral_v{1,2,3}_*`) stay in the vault,
+database and ledger as SUPERSEDED history (append-only); `scenario-build` refuses a case created for
+another scenario id. The numbers in the sections below are those of v4.
+
+**Why v3 (Phase 2.2).** v2 tied nothing across hosts. v3 added two labeled synthetic connections, a
+link ground truth (GT-LNK) and two extra detection checks; see "Cross-host links" below.
 
 **Why v2.** In v1 the synthetic companions put `PSEXESVC.exe` and an SMB admin-share connection at
 stage S3, but the real S3 file shows a PowerShell stager started by a new service, with no network
@@ -100,13 +103,13 @@ offset and aliases when it builds normalized events.
 
 | Stage | Virtual start (+) | Virtual host | Real computer(s) |
 |---|---|---|---|
-| S1 credential theft | 09:00 (+0 min) | WS-FIN-07 | PC04.example.corp |
-| S2 pass-the-hash | 09:25 (+25) | WS-FIN-07 | PC01.example.corp |
-| S3 service-launched PowerShell stager | 09:40 (+40) | SRV-FILE-02 | IEWIN7 |
-| S4 renamed PsExec service | 09:55 (+55) | SRV-FILE-02 | MSEDGEWIN10 |
-| S5 DCSync | 10:35 (+95) | DC-01 | DC1.insecurebank.local |
-| D1 decoy | 12:00 (+3 h) | WS-HR-03 | IEWIN7 |
-| D2 decoy | 14:00 (+5 h) | SRV-WEB-01 | IEWIN7 |
+| S1 credential theft | 09:03:17 | WS-FIN-07 | PC04.example.corp |
+| S2 pass-the-hash | 09:27:41 | WS-FIN-07 | PC01.example.corp |
+| S3 service-launched PowerShell stager | 09:42:09 | SRV-FILE-02 | IEWIN7 |
+| S4 renamed PsExec service | 09:57:33 | SRV-FILE-02 | MSEDGEWIN10 |
+| S5 DCSync | 10:36:52 | DC-01 | DC1.insecurebank.local |
+| D1 decoy | 12:11:26 | WS-HR-03 | IEWIN7 |
+| D2 decoy | 14:08:49 | SRV-WEB-01 | IEWIN7 |
 
 (Virtual day: 2024-03-12 UTC.) Synthetic IPs (RFC 1918): WS-FIN-07 10.20.1.7, SRV-FILE-02
 10.20.2.2, DC-01 10.20.0.1, WS-HR-03 10.20.1.3, SRV-WEB-01 10.20.3.1; benign workstations are
@@ -142,10 +145,10 @@ nothing renumbered).
 - **R3 (PsExec only at S4).** `PsExec.exe`, the renamed `svchost.exe` and the three pipe-open lines
   appear only on SRV-FILE-02 at the S4 time, paired by image basename or pipe name (fields that
   really exist in the S4 events). No synthetic admin-share line exists, and the only synthetic
-  network logon is the unpaired `synth_only=1` CONN-001 line (Phase 2.2);
+  network logon is the unpaired `synth_only=1` LINK-A line (Phase 2.2);
   `PSEXESVC.exe` is not generated because the real S4 service binary is already `svchost.exe`.
-  Synthetic-only records: the credential-dump output file `sekurlsa_out.txt` (S1 shows no file
-  write).
+  Synthetic-only records: the credential-dump output file (S1 shows no file write; v4 gives it an
+  innocuous, document-like name in the profile's Documents folder).
 
 ## Cross-host links
 **Why the real data does not link hosts.** The seven real files are independent captures. S2 is a
@@ -159,13 +162,16 @@ same storyline, so a correlation task would otherwise have no cross-host fact to
 
 | conn_id | Virtual time | Source side | Destination side |
 |---|---|---|---|
-| CONN-001 (LINK-A) | S3 start 09:40:00 plus a seeded 1 to 5 s | WS-FIN-07 `CONN_OUT` (smb), seq 137 | SRV-FILE-02 `LOGON_SUCCESS` type 3, user01, src_ip = WS-FIN-07's synthetic IP, seq 120 |
-| CONN-002 (LINK-B) | the S5 virtual time (10:35:00) | SRV-FILE-02 `CONN_OUT` (drsuapi), seq 157 | DC-01 `CONN_ACCEPTED` (drsuapi), src_ip = SRV-FILE-02's synthetic IP, seq 149 |
+| CONN-0036 (LINK-A) | S3 start 09:42:09 plus a seeded 1 to 5 s (09:42:14) | WS-FIN-07 `CONN_OUT` (smb), seq 85 | SRV-FILE-02 `LOGON_SUCCESS` type 3, user01, src_ip = WS-FIN-07's synthetic IP, seq 90 |
+| CONN-0054 (LINK-B) | the S5 virtual time (10:36:52) | SRV-FILE-02 `CONN_OUT` (drsuapi), seq 147 | DC-01 `CONN_ACCEPTED` (drsuapi), src_ip = SRV-FILE-02's synthetic IP, seq 230 |
+
+(The ids are those of the seed in `scenario.yaml`; they come from the time-ordered numbering of all
+connections, see "Scenario v4". The key files are authoritative.)
 
 Connection lines carry `user=unknown` except the type-3 logon (user01 is the real account of the S2
 file). The existing DCSync line is untouched. Lines are inserted in time order and `seq` is assigned
 afterwards, so it stays contiguous per host in the clean variant. The real S3 inbound-445 record
-does expose address fields, but our IP map is synthetic, so they are not used; the CONN-001 logon
+does expose address fields, but our IP map is synthetic, so they are not used; the LINK-A logon
 line is NOT paired with record 9811 because the real record shows no logon and no account (pairing
 would let a reader think the real file supports the logon).
 
@@ -174,9 +180,9 @@ would let a reader think the real file supports the logon).
 | ID | Hosts | Kind | Basis | Refs |
 |---|---|---|---|---|
 | GT-LNK-001 | WS-FIN-07 (S1 to S2) | stage_continuation | alignment_constructed | real S1 4807, real S2 432903 |
-| GT-LNK-002 | WS-FIN-07 to SRV-FILE-02 (S2 to S3) | lateral_movement | synthetic_only | CONN-001 lines |
+| GT-LNK-002 | WS-FIN-07 to SRV-FILE-02 (S2 to S3) | lateral_movement | synthetic_only | LINK-A lines (CONN-0036) |
 | GT-LNK-003 | SRV-FILE-02 (S3 to S4) | stage_continuation | alignment_constructed | real S3 9804, real S4 409645 |
-| GT-LNK-004 | SRV-FILE-02 to DC-01 (S4 to S5) | remote_replication | synthetic_only | CONN-002 lines (perturbed: only the surviving source side) |
+| GT-LNK-004 | SRV-FILE-02 to DC-01 (S4 to S5) | remote_replication | synthetic_only | LINK-B lines (CONN-0054; perturbed: only the surviving source side) |
 
 Each link states in `real_evidence_note` what the real files do and do not show, and in
 `expected_agent_statement` what a careful agent should say. GT-MIS-004 states that real
@@ -196,9 +202,38 @@ by a test oracle (`tests/oracles.py`, test helpers, not the Phase 4 detectors).
 
 | ID | Kind | What | Magnitude | Pairing | Detection that actually works |
 |---|---|---|---|---|---|
-| GT-CON-001 (P1) | timestomp | `C:\Windows\svchost.exe` (rec 272) and `C:\Windows\system32\PsExec.exe` (rec 339) on SRV-FILE-02: `si_created`/`si_modified` set to 2021-06-15, `fn_*` keep 2024-03-12 09:54:57 / 09:54:48 | 2 files; deltas 86476700 s and 86470528 s | image basename `svchost.exe`, `psexec.exe` (real S4 images) | `si_fn_mismatch` only. No real file-create or service-install event exists for these files, so a cross-source creation-time check is NOT claimed |
-| GT-CON-002 (P2) | clock_skew | every SRV-FILE-02 auth line (272, including the 2 synthetic link lines) shifted +420 s | 420 s | `pipe_name`: lines seq 125/126/127 pair with real Sysmon 18 records 409652/409650/409651 (all aligned to 09:55:01) | `paired_line_time_delta`: delta 0 s clean, +420 s perturbed, for all 3 paired lines (whole-second comparison after alignment). `cross_host_pair_delta`: CONN-001's two ends (WS-FIN-07 seq 137, SRV-FILE-02 seq 120) differ by 0 s clean and +420 s perturbed; **synthetic vs synthetic**, no real event involved |
-| GT-CON-003 (P3) | log_gap | all DC-01 auth lines 10:31:00 to 10:43:00 removed (13 lines, seq 144-156), `seq` not renumbered; the removed lines include the DCSync line and CONN-002's DC-01 end (seq 149) | 720 s | real S5 4662 records 202791-202793 (aligned 10:35:00) fall inside the window | `seq_discontinuity`, `real_events_inside_gap`; `unmatched_connection`: CONN-002's SRV-FILE-02 end (seq 157) has no DC-01 counterpart in perturbed; in clean every conn_id has both ends |
+| GT-CON-001 (P1) | timestomp | `C:\Windows\svchost.exe` (rec 261) and `C:\Windows\system32\PsExec.exe` (rec 330) on SRV-FILE-02: `si_created`/`si_modified` set to 2021-06-15 (12:36:37 / 14:19:20), `fn_*` keep 2024-03-12 09:57:30 / 09:57:21 | 2 files; deltas 86476853 s and 86470681 s | image basename `svchost.exe`, `psexec.exe` (real S4 images) | `si_fn_mismatch` only. No real file-create or service-install event exists for these files, so a cross-source creation-time check is NOT claimed |
+| GT-CON-002 (P2) | clock_skew | every SRV-FILE-02 auth line (340, benign background and the 2 synthetic link lines included) shifted +420 s | 420 s | `pipe_name`: lines seq 102/103/104 pair with real Sysmon 18 records 409650-409652 (aligned 09:57:34) | `paired_line_time_delta`: delta 0 s clean, +420 s perturbed, for all 3 paired lines (whole-second comparison after alignment). `cross_host_pair_delta`: LINK-A's two ends (CONN-0036: WS-FIN-07 seq 85, SRV-FILE-02 seq 90) differ by 0 s clean and +420 s perturbed; so does every benign connection with an end on SRV-FILE-02 (+420 s when SRV-FILE-02 holds the destination end, -420 s the source end); **synthetic vs synthetic**, no real event involved |
+| GT-CON-003 (P3) | log_gap | all DC-01 auth lines 10:29:04 to 10:41:04 removed (23 lines, seq 216-238), `seq` not renumbered; the window start is the DCSync time minus a seeded 468 s; the removed lines include the DCSync line and LINK-B's DC-01 end (CONN-0054, seq 230) | 720 s | real S5 4662 records 202791-202793 (aligned 10:36:52) fall inside the window | `seq_discontinuity`, `real_events_inside_gap`; `unmatched_connection`: CONN-0054's SRV-FILE-02 end (seq 147) has no DC-01 counterpart in perturbed; in clean every conn_id has both ends. **Expected collateral** (`expected_collateral_conn_ids`): the benign connections CONN-0053 and CONN-0055 also lose their DC-01 end |
+
+## Scenario v4 (Phase 4.1): what changed and why
+The Phase 4 style audit found that referenced (key) lines differed from benign synthetic lines in
+superficial ways: event types `NAMED_PIPE_OPEN` and `CONN_*`, users `user01` and `unknown`, source
+addresses, extension/directory/depth of timeline rows, round `:00` times, and a middle-of-the-log
+position. An LLM could have used those habits instead of reasoning, and with no complete benign
+connection pair the `unmatched_connection` detector only ever saw the two planted links. v4 keeps
+the storyline, the real files and the three perturbation types and changes only the generator.
+
+| Rule | What v4 does |
+|---|---|
+| G1 vocabulary | Benign auth lines use the same event types (`LOGON_SUCCESS` types 2/3/5/10 and 9 for user01 on the workstation, `LOGON_FAILURE`, `LOGOFF`, Kerberos/SMB events, `NAMED_PIPE_OPEN`, `CONN_OUT`/`CONN_ACCEPTED` as complete pairs, `DIRECTORY_REPLICATION_REQUEST` of a sync service account), about 8 accounts per host (user01, machine accounts, a service account, Administrator), the 10.20.x.x map plus other workstation/printer/server addresses that appear only as `src_ip` values. Connection lines use `user=unknown` in benign and key lines alike. About 90 benign connection pairs (`benign_connection_pairs` in `scenario.yaml`) run only between the three logged hosts (smb, rpc, ldap, kerberos and drsuapi name resolution, never replication). No benign connection with the same (source, destination, service) lies within 300 s of a key link. Benign pipe names are ordinary (spoolss, samr, srvsvc, lsarpc, netlogon, atsvc, names with hexadecimal or process ids) and are disjoint from every pipe name of the real events of that host (`field_inspection.json`). |
+| G2 connection ids | `conn_id` is `CONN-` plus four digits, assigned after ALL connections are placed in time order: ids increase with time; the two key connections get ordinary mid-sequence ids (CONN-0036, CONN-0054 of 92). The pattern lives in one place (`schemas/common.CONN_ID_PATTERN`). |
+| G3 time | First-key-event times are non-round (S1 09:03:17, S2 09:27:41, S3 09:42:09, S4 09:57:33, S5 10:36:52, D1 12:11:26, D2 14:08:49; offsets recomputed, microseconds kept). Per-host log spans: WS-FIN-07 07:30-15:30, SRV-FILE-02 06:00-16:00, DC-01 08:00-11:30, with a working-hours density (15-minute buckets, uniform seconds inside), so key lines sit at different relative positions (deciles 2, 3, 4, 7). The auth log format has whole seconds only, so benign "sub-second" values do not exist; seconds are not systematically :00. The P3 window is 720 s, contains the DCSync time, and starts DCSync minus a seeded 200-520 s, never on a minute boundary. |
+| G4 filesystem | Benign rows cover System32 (including a benign `svchost.exe` and `powershell.exe` in their normal directories), Windows root, Prefetch, Program Files, ProgramData and user profiles (Documents, Downloads, Temp, Desktop tool folders), with the extensions, depths and size spread of the attacker rows; recently dropped files have created == modified like the attacker rows; the WS profile named by the real mimikatz path (`IEUser`) exists in the benign rows. The credential-dump output file has a document-like name (`<word>_<n>.txt`) in the profile's Documents folder; the key says the name is innocuous by design and the row stays `synth_only`. |
+| G5 perturbations | Unchanged in kind. P2 shifts every SRV-FILE-02 line (benign included). P3 removes the DC-01 window without renumbering; benign connections whose DC-01 end was removed lose exactly one end and are listed in `expected_collateral_conn_ids` of GT-CON-003 (validated: each id has two ends in the clean variant and one in the perturbed variant; the perturbed one-ended ids are exactly the collateral plus the GT-LNK-004 id). |
+| G6 earlier rules | Every synthetic attacker line is paired (a field that really exists in the real event) or `synth_only=1`; benign lines carry no marker; markers stay out of the agent view. |
+
+**Collateral.** Removing a log window breaks whatever connection had its other end there. A careful
+agent sees those one-ended connections too, and it should explain them by the gap (the detector names
+the `sequence_gap` hit) rather than report them as separate attacker activity. The evaluation counts
+detector hits on collateral ids as "explained collateral", separately from the key link
+(GT-LNK-004) and from unexpected hits.
+
+**Residual tells** (unavoidable, documented in `docs/style_audit.md`): the key pipe lines carry a
+real computer name inside the pipe name (`svchost-MSEDGEWIN10-8116-stdin`; pairing requires the
+real name); the file names `mimikatz.exe`, `PsExec.exe` and the PowerShell prefetch hash are
+real-image or hash-dependent names; the depth-2 path `C:\Windows\svchost.exe` makes the audit's
+3-component directory prefix equal the path.
 
 ## Adjudication of events outside the key
 Real captures contain events the key does not list. `adjudication.yaml` (schema
@@ -212,12 +247,14 @@ The committed drafts are decided by "claude-code-draft, pending human review" (1
 unclear, 2 not_attack). Noteworthy events of the decoy sources are covered by GT-DEC-001/002.
 
 ## Companion sources
-- **File timeline CSV** columns: `record_id, host, path, size, si_*, fn_*, note`. About 400 benign
+- **File timeline CSV** columns: `record_id, host, path, size, si_*, fn_*, note`. About 380 benign
   rows per host. Attacker rows are timed from real key events and carry the pairing marker.
-- **Auth/network log**: one line per event, `key=value`, `seq` +1 per line per host. About 800
-  benign lines in total plus lines paired with real events (pass-the-hash logon by logon id;
-  three `NAMED_PIPE_OPEN` lines by pipe name; the DCSync request by logon id, `src_ip=unknown`
-  because the real 4662 events do not show the origin); plus the four `conn_id` link lines above.
+- **Auth/network log**: one line per event, `key=value`, `seq` +1 per line per host. 800 standalone
+  benign lines in total (`benign_auth_lines_total`) plus the ends of about 90 benign connection
+  pairs (`benign_connection_pairs`), plus lines paired with real events (pass-the-hash logon by
+  logon id; three `NAMED_PIPE_OPEN` lines by pipe name; the DCSync request by logon id,
+  `src_ip=unknown` because the real 4662 events do not show the origin); plus the four `conn_id`
+  link lines above.
 - Parsers (`scenarios/companions.py`) skip `#` and blank lines and reject malformed lines.
 - Noise knobs live in `scenario.yaml` because the answer-key hashes depend on them.
 
@@ -225,7 +262,7 @@ unclear, 2 not_attack). Noteworthy events of the decoy sources are covered by GT
 - Companions are synthetic and the timeline is stitched from independent captures: the storyline
   is plausible, not a real incident.
 - The S4 `PsExec.exe` runs locally per the real events; the key does not claim a remote origin
-  for S3 or S4. Who connected to SRV-FILE-02 is shown only by the SYNTHETIC CONN-001 lines.
+  for S3 or S4. Who connected to SRV-FILE-02 is shown only by the SYNTHETIC LINK-A lines.
 - The S2 log clear (T1070.001) may be lab preparation by the dataset author; it is medium and
   documented as such.
 - P1 is detectable only from the single file-system record; there is no cross-source check.

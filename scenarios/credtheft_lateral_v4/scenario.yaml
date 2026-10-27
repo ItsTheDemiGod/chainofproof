@@ -1,15 +1,18 @@
-scenario_id: credtheft_lateral_v3
+scenario_id: credtheft_lateral_v4
 title: Credential theft and lateral movement (composite)
 description: Independent real EVTX captures stitched into one storyline by an alignment layer (time offsets
   + host aliases), plus SYNTHETIC companion sources that are paired with real events or marked synthetic-only.
   Two real captures from unrelated incidents are decoys. Cross-host links (WS-FIN-07 to SRV-FILE-02 to DC-01)
   exist only as labeled SYNTHETIC lines (synth_only=1, shared conn_id) because the real captures tie no host
   to another.
-supersedes: credtheft_lateral_v2
-supersedes_reason: v2 had no cross-host evidence at all (the real S2 logon is local, S3 shows an inbound TCP 445
-  connection with no account, S4 is local PsExec, the real DCSync events show no source address). v3 adds a few
-  labeled SYNTHETIC cross-host auth/connection lines (conn_id CONN-001 and CONN-002), the link ground truth
-  (GT-LNK) and two extra detection checks. v2 itself supersedes credtheft_lateral_v1 (see docs/decisions.md).
+supersedes: credtheft_lateral_v3
+supersedes_reason: the Phase 4 style audit showed that key-referenced synthetic lines could be told apart from
+  benign ones by generator habits (event types, users, source IPs, round-second times, middle-of-log position,
+  file extension/directory/depth, no complete benign connection pairs). v4 keeps the storyline, the real files and
+  the three perturbation types, but rebuilds the benign background with the same vocabulary as the key lines,
+  adds complete benign connection pairs, gives connections time-ordered ids, uses non-round stage times and
+  per-host log spans, and records the benign connections broken by the DC-01 gap as expected collateral.
+  v3 itself supersedes credtheft_lateral_v2, which supersedes credtheft_lateral_v1 (see docs/decisions.md).
 dataset_provenance:
   repo_url: https://github.com/sbousseaden/EVTX-ATTACK-SAMPLES
   clone_commit: 4ceed2f4706daf601c212a8f91c113dd85349a2c
@@ -37,6 +40,7 @@ virtual_hosts:
 noise:
   benign_fs_entries_per_host: 400
   benign_auth_lines_total: 800
+  benign_connection_pairs: 90
 sources:
 - source_key: s1_lsass_mimikatz
   kind: real_evtx
@@ -180,43 +184,43 @@ stages:
 alignment:
 - source_key: s1_lsass_mimikatz
   real_first_key_event_time: '2019-03-17T19:37:11.661928Z'
-  virtual_first_key_event_time: '2024-03-12T09:00:00.661928Z'
-  time_offset_seconds: 157382569
+  virtual_first_key_event_time: '2024-03-12T09:03:17.661928Z'
+  time_offset_seconds: 157382766
   host_aliases:
     PC04.example.corp: WS-FIN-07
 - source_key: s2_pth_logon
   real_first_key_event_time: '2019-03-18T11:06:29.911579Z'
-  virtual_first_key_event_time: '2024-03-12T09:25:00.911579Z'
-  time_offset_seconds: 157328311
+  virtual_first_key_event_time: '2024-03-12T09:27:41.911579Z'
+  time_offset_seconds: 157328472
   host_aliases:
     PC01.example.corp: WS-FIN-07
 - source_key: s3_psexec_smb
   real_first_key_event_time: '2019-04-30T20:26:51.793589Z'
-  virtual_first_key_event_time: '2024-03-12T09:40:00.793589Z'
-  time_offset_seconds: 153580389
+  virtual_first_key_event_time: '2024-03-12T09:42:09.793589Z'
+  time_offset_seconds: 153580518
   host_aliases:
     IEWIN7: SRV-FILE-02
 - source_key: s4_renamed_psexec
   real_first_key_event_time: '2020-09-27T13:42:00.726774Z'
-  virtual_first_key_event_time: '2024-03-12T09:55:00.726774Z'
-  time_offset_seconds: 109023180
+  virtual_first_key_event_time: '2024-03-12T09:57:33.726774Z'
+  time_offset_seconds: 109023333
   host_aliases:
     MSEDGEWIN10: SRV-FILE-02
 - source_key: s5_dcsync
   real_first_key_event_time: '2019-05-08T02:10:43.487217Z'
-  virtual_first_key_event_time: '2024-03-12T10:35:00.487217Z'
-  time_offset_seconds: 152958257
+  virtual_first_key_event_time: '2024-03-12T10:36:52.487217Z'
+  time_offset_seconds: 152958369
   host_aliases:
     DC1.insecurebank.local: DC-01
 - source_key: d1_winlogon_persist
   real_first_key_event_time: '2019-06-14T22:22:17.988371Z'
-  virtual_first_key_event_time: '2024-03-12T12:00:00.988371Z'
-  time_offset_seconds: 149693863
+  virtual_first_key_event_time: '2024-03-12T12:11:26.988371Z'
+  time_offset_seconds: 149694549
   host_aliases:
     IEWIN7: WS-HR-03
 - source_key: d2_rundll32_lolbin
   real_first_key_event_time: '2019-05-12T14:18:03.589506Z'
-  virtual_first_key_event_time: '2024-03-12T14:00:00.589506Z'
-  time_offset_seconds: 152581317
+  virtual_first_key_event_time: '2024-03-12T14:08:49.589506Z'
+  time_offset_seconds: 152581846
   host_aliases:
     IEWIN7: SRV-WEB-01

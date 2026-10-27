@@ -123,7 +123,11 @@ def test_p2_paired_lines_match_real_event_times(fx, gens):
 
     def paired(v):
         rows = parse_auth_log(gens[v][0] / "auth_srv_file_02.log")
-        return {r["pipe"]: parse_ts(r["ts"]) for r in rows if r["event"] == "NAMED_PIPE_OPEN"}
+        return {  # only the key lines carry a pair marker; benign pipe lines have no real twin
+            r["pipe"]: parse_ts(r["ts"])
+            for r in rows
+            if r["event"] == "NAMED_PIPE_OPEN" and "pair" in r
+        }
 
     assert set(paired(Variant.clean)) == set(want) and len(want) == 3
     for pipe, t in want.items():

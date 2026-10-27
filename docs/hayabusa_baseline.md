@@ -5,7 +5,7 @@ counts as *detected* when at least one Hayabusa rule fired on one of its REAL su
 events (synthetic companion lines are invisible to Hayabusa). This is the reference point
 for the Phase 9 evaluation.
 
-## credtheft_lateral_v3_clean
+## credtheft_lateral_v4_clean
 
 | item | real ref | detected | best level | rules (level) |
 |---|---|---|---|---|
@@ -24,7 +24,7 @@ for the Phase 9 evaluation.
 
 **GT-ADJ: 2 of 2 detected** (best level: informational=2)
 
-## credtheft_lateral_v3_perturbed
+## credtheft_lateral_v4_perturbed
 
 | item | real ref | detected | best level | rules (level) |
 |---|---|---|---|---|

@@ -7,6 +7,7 @@ the real event(s) it is paired with and the shared field/value (``pairing_*``), 
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -131,6 +132,17 @@ class GroundTruthContradiction(StrictModel):
     params: dict[str, Any]  # exact, machine-checkable parameters (host, window, files...)
     detectable_by: str  # plain words; ONLY checks that tests/oracles.py proves to work
     checks: list[str] = []  # machine names of those checks (keys of tests/oracles.CHECKS)
+    # log_gap only: benign conn_ids that lose exactly one end because the gap removed it
+    expected_collateral_conn_ids: list[str] = []
+
+    @model_validator(mode="after")
+    def _collateral_valid(self) -> GroundTruthContradiction:
+        ids = self.expected_collateral_conn_ids
+        if ids and self.kind != ContradictionKind.log_gap:
+            raise ValueError(f"{self.id}: collateral conn ids only belong to a log_gap")
+        if ids != sorted(set(ids)) or not all(re.match(CONN_ID_PATTERN, i) for i in ids):
+            raise ValueError(f"{self.id}: collateral conn ids must be sorted, unique CONN ids")
+        return self
 
 
 class GroundTruthDecoy(StrictModel):

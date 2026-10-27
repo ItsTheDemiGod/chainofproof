@@ -63,7 +63,7 @@ The scenario IP map is never used. An IP is attached to a host (`used_by`) only 
 agent-view data itself shows it: a Sysmon 3 event with `Initiated=true` (source address is local) or
 `Initiated=false` (destination address is local), or a `CONN_OUT` line (the sender's own address).
 Every other IP stays unresolved and is counted (`ips_resolved` / `ips_unresolved` in `graph_stats`
-and `graph-build`). In the v3 cases: 4 resolved, 51 unresolved (the benign source addresses).
+and `graph-build`). In the v4 cases: 4 resolved, 57 unresolved (the benign source addresses).
 
 ## Determinism
 

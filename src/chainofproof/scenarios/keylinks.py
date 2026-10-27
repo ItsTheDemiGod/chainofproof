@@ -7,23 +7,24 @@ puts on the same host, in order) and ``synthetic_only`` (the connection exists o
 
 from __future__ import annotations
 
+from collections import Counter
 from pathlib import Path
 
 from chainofproof.scenarios.companions import parse_auth_log, row_marker
-from chainofproof.scenarios.gen_links import CONN_A, CONN_B
 from chainofproof.scenarios.generator import GenResult
 from chainofproof.scenarios.inventory import Inventory
 from chainofproof.scenarios.keyevents import KeyEvent
 from chainofproof.schemas.scenario import (
     AnswerKey,
+    ContradictionKind,
     GroundTruthLink,
     LinkBasis,
     LinkKind,
     LinkRef,
     Scenario,
+    SourceKind,
 )
 
-CONN_OF = {"LINK_A": CONN_A, "LINK_B": CONN_B}
 WS, SRV, DC = "WS-FIN-07", "SRV-FILE-02", "DC-01"
 
 
@@ -45,7 +46,7 @@ def _synth(gen: GenResult, *tags: str) -> list[LinkRef]:
                     source_key=sk,
                     event_record_id=seq,
                     synthetic_only=True,
-                    conn_id=CONN_OF[tag.split(":")[0]],
+                    conn_id=gen.link_conn[tag.split(":")[0]],
                 )
             )
     return out
@@ -56,6 +57,7 @@ def build_links(scenario: Scenario, inv: Inventory, gen: GenResult) -> list[Grou
     account = next(
         e.facts["TargetUserName"] for e in inv.keys_for("S2").result.events if e.event_id == 4624
     )
+    conn_a, conn_b = gen.link_conn["LINK_A"], gen.link_conn["LINK_B"]
     lost = "LINK_B:dst" not in gen.link_seq
     removed = (
         " In this variant the destination-side line was removed by the DC-01 log gap (GT-CON-003)."
@@ -98,10 +100,10 @@ def build_links(scenario: Scenario, inv: Inventory, gen: GenResult) -> list[Grou
                 "ntsvcs pipe on SRV-FILE-02; it does not show which account connected or from "
                 f"which host. The real S2 file shows the {account} logon on WS-FIN-07 only, a "
                 "local logon. The only evidence of a connection from WS-FIN-07 to SRV-FILE-02 is "
-                f"the pair of SYNTHETIC synth_only lines with conn_id {CONN_A}."
+                f"the pair of SYNTHETIC synth_only lines with conn_id {conn_a}."
             ),
             expected_agent_statement=(
-                f"A SYNTHETIC SMB connection ({CONN_A}) and type 3 logon of {account} from "
+                f"A SYNTHETIC SMB connection ({conn_a}) and type 3 logon of {account} from "
                 "WS-FIN-07 to SRV-FILE-02 is the only evidence of the hop; the real S3 file does "
                 "not show the account or the source host."
             ),
@@ -141,14 +143,50 @@ def build_links(scenario: Scenario, inv: Inventory, gen: GenResult) -> list[Grou
                 "controller with an account and logon id but no source address or connection "
                 "record; the real S4 file is local to SRV-FILE-02. Nothing real shows that "
                 "SRV-FILE-02 made the replication request. The connection is shown only by "
-                f"SYNTHETIC synth_only lines with conn_id {CONN_B}." + removed
+                f"SYNTHETIC synth_only lines with conn_id {conn_b}." + removed
             ),
             expected_agent_statement=(
-                f"Only SYNTHETIC lines ({CONN_B}) place the replication request on SRV-FILE-02; "
+                f"Only SYNTHETIC lines ({conn_b}) place the replication request on SRV-FILE-02; "
                 "the real DCSync events do not show where the request came from."
             ),
         ),
     ]
+
+
+def _end_counts(scenario: Scenario, folder: Path) -> Counter[str]:
+    """conn_id -> number of lines carrying it, over every synthetic auth log of a variant."""
+    n: Counter[str] = Counter()
+    for s in scenario.sources:
+        if s.kind == SourceKind.synthetic_auth_log:
+            n.update(
+                r["conn_id"] for r in parse_auth_log(folder / s.relative_path) if "conn_id" in r
+            )
+    return n
+
+
+def check_collateral(
+    key: AnswerKey, scenario: Scenario, clean_dir: Path, perturbed_dir: Path
+) -> list[str]:
+    """Problems with expected_collateral_conn_ids of a perturbed key (empty when it is exact).
+
+    Each collateral id has both ends in the clean variant and exactly one in the perturbed one;
+    the perturbed variant's one-ended ids are exactly the collateral set plus the GT-LNK-004 id.
+    """
+    gap = next((c for c in key.contradictions if c.kind == ContradictionKind.log_gap), None)
+    if gap is None:
+        return []
+    link_b = next(ln for ln in key.links if ln.id == "GT-LNK-004").evidence_refs[0].conn_id
+    clean, pert = _end_counts(scenario, clean_dir), _end_counts(scenario, perturbed_dir)
+    ids = gap.expected_collateral_conn_ids
+    problems = [
+        f"{gap.id}: collateral {c}: ends clean={clean[c]} perturbed={pert[c]} (want 2 and 1)"
+        for c in ids
+        if (clean[c], pert[c]) != (2, 1)
+    ]
+    one_ended = {c for c, n in pert.items() if n == 1}
+    if one_ended != set(ids) | {link_b}:
+        problems.append(f"{gap.id}: one-ended conn ids differ from collateral + {link_b}")
+    return problems
 
 
 def check_link_refs(key: AnswerKey, scenario: Scenario, inv: Inventory, gen_dir: Path) -> list[str]:

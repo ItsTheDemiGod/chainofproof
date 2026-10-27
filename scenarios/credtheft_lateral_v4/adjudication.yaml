@@ -1,4 +1,4 @@
-scenario_id: credtheft_lateral_v3
+scenario_id: credtheft_lateral_v4
 policy: 'A finding produced by an agent that is NOT in the answer key is scored by this list. Listed as true_finding:
   counts as a true positive. Listed as not_attack: counts as a false positive. Listed as unclear: reported separately
   and excluded from precision and recall. Not listed at all: counted as an unlisted finding, reported separately for

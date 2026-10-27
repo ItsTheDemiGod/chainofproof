@@ -16,6 +16,7 @@ from chainofproof.config import Paths
 from chainofproof.custody.hashing import sha256_file
 from chainofproof.eval.detector_eval import match_hits
 from chainofproof.eval.gt_link import build_index
+from chainofproof.scenarios.build import real_pipes
 from chainofproof.scenarios.dataset import scenario_dir
 from chainofproof.scenarios.generator import generate_variant
 from chainofproof.scenarios.inventory import load_inventory
@@ -42,6 +43,7 @@ class SeedRow:
     variant: str
     found: dict[str, bool] = field(default_factory=dict)
     unexpected: list[str] = field(default_factory=list)
+    collateral: tuple[int, int] = (0, 0)  # (explained collateral hits, collateral ids in the key)
     error: str | None = None
 
 
@@ -86,7 +88,8 @@ def _one(scn: Scenario, inv, variant: Variant, seed: int, real, idx) -> SeedRow:
     seeded = scn.model_copy(update={"seed": seed})
     try:
         with tempfile.TemporaryDirectory(prefix="cop_robust_") as tmp:
-            gen = generate_variant(seeded, inv, variant, Path(tmp))
+            pipes = real_pipes(scn.scenario_id, scn)
+            gen = generate_variant(seeded, inv, variant, Path(tmp), pipes)
             key = build_key(seeded, inv, variant, gen)
             events, refs, labels = _synthetic(seeded, Path(tmp))
     except Exception as e:  # noqa: BLE001 - report, never hide, a generator failure
@@ -106,4 +109,5 @@ def _one(scn: Scenario, inv, variant: Variant, seed: int, real, idx) -> SeedRow:
     ev = match_hits(key, hits, resolve, label_of, variant, f"seed{seed}")
     row.found = {c.con_id: c.found for c in ev.cons}
     row.unexpected = [f"{h.detector}/{h.kind}" for h in ev.unexpected]
+    row.collateral = (len(ev.explained), len(ev.collateral_ids))
     return row

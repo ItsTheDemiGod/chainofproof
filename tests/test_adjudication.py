@@ -15,14 +15,14 @@ from chainofproof.schemas.adjudication import (
 )
 from chainofproof.schemas.scenario import ScenarioError, Variant
 
-V3 = Path(__file__).resolve().parents[1] / "scenarios" / "credtheft_lateral_v3"
+V4 = Path(__file__).resolve().parents[1] / "scenarios" / "credtheft_lateral_v4"
 
 
 @pytest.fixture
-def adj(v3):
-    keys = list(v3.keys.values())
+def adj(v4):
+    keys = list(v4.keys.values())
     return load_adjudication(
-        V3 / "adjudication.yaml", v3.scn, keys, load_known_events(V3 / "field_inspection.json")
+        V4 / "adjudication.yaml", v4.scn, keys, load_known_events(V4 / "field_inspection.json")
     )
 
 
@@ -54,8 +54,8 @@ def test_committed_file_is_valid_and_drafts_are_flagged(adj):
     }
 
 
-def test_policy_scoring(adj, v3):
-    keys = list(v3.keys.values())
+def test_policy_scoring(adj, v4):
+    keys = list(v4.keys.values())
     assert adj.score("s3_psexec_smb", 9806, keys) == "key"  # the service ImagePath write
     assert adj.score("s3_psexec_smb", 9813, keys) == "true_positive"  # listed true_finding
     assert adj.score("s3_psexec_smb", 9810, keys) == "unclear"  # listed unclear
@@ -69,42 +69,42 @@ def test_policy_scoring(adj, v3):
     assert extra.score("s3_psexec_smb", 9810, keys) == "true_positive"
 
 
-def test_every_nonkey_event_of_inspected_sources_is_accounted_for(adj, v3):
+def test_every_nonkey_event_of_inspected_sources_is_accounted_for(adj, v4):
     """Rows not in the key are either adjudicated or are the known benign 4688/other leftovers."""
-    keys = list(v3.keys.values())
+    keys = list(v4.keys.values())
     for sk in ("s3_psexec_smb", "s4_renamed_psexec"):
-        for r in v3.rows(sk):
+        for r in v4.rows(sk):
             assert adj.score(sk, r["record_id"], keys) != "unlisted", (sk, r["record_id"])
 
 
-def test_validation_errors(v3):
-    keys = list(v3.keys.values())
+def test_validation_errors(v4):
+    keys = list(v4.keys.values())
 
     def build(entries):
-        return Adjudication(scenario_id=v3.scn.scenario_id, policy=POLICY, entries=entries)
+        return Adjudication(scenario_id=v4.scn.scenario_id, policy=POLICY, entries=entries)
 
     with pytest.raises(ValueError, match="duplicate"):
         build([entry(), entry()])
     with pytest.raises(ValueError, match="not a real source"):
-        build([entry(source_key="fs_ws_fin_07")]).check_against(v3.scn, keys)
+        build([entry(source_key="fs_ws_fin_07")]).check_against(v4.scn, keys)
     with pytest.raises(ValueError, match="already in the answer key"):
-        build([entry(event_record_id=9806, event_id=13)]).check_against(v3.scn, keys)
+        build([entry(event_record_id=9806, event_id=13)]).check_against(v4.scn, keys)
     with pytest.raises(ValueError, match="not found"):
         build([entry(event_id=3)]).check_against(
-            v3.scn, keys, load_known_events(V3 / "field_inspection.json")
+            v4.scn, keys, load_known_events(V4 / "field_inspection.json")
         )
     with pytest.raises(ValueError, match="different scenario"):
-        Adjudication(scenario_id="other", policy=POLICY, entries=[]).check_against(v3.scn, keys)
+        Adjudication(scenario_id="other", policy=POLICY, entries=[]).check_against(v4.scn, keys)
     with pytest.raises(ValueError, match="empty"):
         Adjudication(scenario_id="x", policy=" ", entries=[])
 
 
-def test_loader_roundtrip_and_errors(tmp_path, v3):
+def test_loader_roundtrip_and_errors(tmp_path, v4):
     p = tmp_path / "a.yaml"
     save_adjudication(
-        p, Adjudication(scenario_id=v3.scn.scenario_id, policy=POLICY, entries=[entry()])
+        p, Adjudication(scenario_id=v4.scn.scenario_id, policy=POLICY, entries=[entry()])
     )
-    assert load_adjudication(p, v3.scn, list(v3.keys.values())).entries[0].event_record_id == 9810
+    assert load_adjudication(p, v4.scn, list(v4.keys.values())).entries[0].event_record_id == 9810
     p.write_text("scenario_id: x\npolicy: p\nentries:\n- id: bad\n", encoding="utf-8")
     with pytest.raises(ScenarioError, match="a.yaml"):
         load_adjudication(p)
@@ -114,8 +114,8 @@ def test_loader_roundtrip_and_errors(tmp_path, v3):
 
 # ---- the Security 1102 (audit log cleared) entry ------------------------------------------------
 @pytest.mark.parametrize("variant", list(Variant))
-def test_1102_action_in_both_keys(v3, variant):
-    acts = [a for a in v3.keys[variant].actions if a.attack_technique_id == "T1070.001"]
+def test_1102_action_in_both_keys(v4, variant):
+    acts = [a for a in v4.keys[variant].actions if a.attack_technique_id == "T1070.001"]
     assert len(acts) == 1
     a = acts[0]
     assert (a.id, a.stage_id, a.virtual_host) == ("GT-ACT-008", "S2", "WS-FIN-07")
@@ -124,12 +124,12 @@ def test_1102_action_in_both_keys(v3, variant):
         ("s2_pth_logon", 432901, 1102)
     ]
     assert "lab preparation" in a.rationale
-    rows = {r["record_id"]: r for r in v3.rows("s2_pth_logon")}
+    rows = {r["record_id"]: r for r in v4.rows("s2_pth_logon")}
     assert rows[432901]["event_id"] == 1102
 
 
-def test_existing_action_ids_did_not_move(v3):
-    got = [(a.id, a.stage_id, a.attack_technique_id) for a in v3.keys[Variant.clean].actions]
+def test_existing_action_ids_did_not_move(v4):
+    got = [(a.id, a.stage_id, a.attack_technique_id) for a in v4.keys[Variant.clean].actions]
     assert got == [
         ("GT-ACT-001", "S1", "T1003.001"),
         ("GT-ACT-002", "S2", "T1550.002"),
@@ -142,14 +142,14 @@ def test_existing_action_ids_did_not_move(v3):
     ]
 
 
-def test_1102_precedes_the_4624_by_about_four_seconds(v3):
-    rows = {r["record_id"]: r for r in v3.rows("s2_pth_logon")}
-    d = v3.aligned("s2_pth_logon", rows[432903]) - v3.aligned("s2_pth_logon", rows[432901])
+def test_1102_precedes_the_4624_by_about_four_seconds(v4):
+    rows = {r["record_id"]: r for r in v4.rows("s2_pth_logon")}
+    d = v4.aligned("s2_pth_logon", rows[432903]) - v4.aligned("s2_pth_logon", rows[432901])
     assert 4 <= d.total_seconds() <= 5
 
 
-def test_s3_service_link_is_stated_with_its_gaps(v3):
+def test_s3_service_link_is_stated_with_its_gaps(v4):
     for variant in Variant:
-        smb = next(a for a in v3.keys[variant].actions if a.attack_technique_id == "T1021.002")
+        smb = next(a for a in v4.keys[variant].actions if a.attack_technique_id == "T1021.002")
         assert "no network logon" in (smb.description + smb.rationale).lower()
         assert smb.confidence.value == "medium"

@@ -38,6 +38,7 @@ Agents may all use the same local model with different prompts and different too
 - Phase 2.2: Cross-host synthetic links [DONE]
 - Phase 3: Forensic tool layer and normalized event format [DONE]
 - Phase 4: Evidence graph and contradiction detectors [DONE]
+- Phase 4.1: Generator realism rebuild, scenario v4 [DONE]
 - Phase 5: Agent core (LLM client, planner loop, citation verifier) [TODO]
 - Phase 6: Skeptic, calibration, missing-evidence reasoning [TODO]
 - Phase 7: Prompt-injection defense [TODO]
@@ -55,6 +56,9 @@ Agents may all use the same local model with different prompts and different too
 - D2: detectors are separate, individually callable tools with explicit parameters. Nothing in the query API runs them automatically; agents decide to call them. "Run all detectors" exists only in the eval harness and the `detect-all` CLI.
 - D3: detector thresholds come from first principles, live in `config/settings.yaml` (section `detectors`) and `docs/decisions.md`, and are never tuned afterwards to improve scores.
 - D6: detector hits are citable evidence: citation ids are `EVT-<12hex>` (events) or `HIT-######` (detector hits). `FND-####` stays reserved for Phase 5 agent findings.
+
+## Synthetic realism (Phase 4.1)
+- Synthetic benign data must share the vocabulary of attacker-related synthetic lines; key-referenced lines must not be separable by superficial features; residual unavoidable tells are documented in docs/style_audit.md.
 
 ## Conventions
 - IDs added in Phase 4: detector hits `HIT-######`.

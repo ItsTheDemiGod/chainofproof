@@ -1,34 +1,24 @@
 """Companion B (SYNTHETIC): per-host authentication / network log, key=value lines.
 
-Benign lines are random but seeded. A few lines describe the SAME actions as real key events and
-carry ``pair=<field>:<value>`` naming the value they share with the real event(s) (rule R1).
-``seq`` is assigned
-after sorting and increases by exactly 1 per line within a host.
+Benign lines are seeded and share the vocabulary of the key lines (``gen_benign``, ``gen_conns``).
+A few lines describe the SAME actions as real key events and carry ``pair=<field>:<value>`` naming
+the value they share with the real event(s) (rule R1); the cross-host link lines are
+``synth_only=1``. ``seq`` is assigned after sorting and increases by exactly 1 per line within a
+host. All hosts are generated together because connection ids are global (time-ordered).
 """
 
 from __future__ import annotations
 
-import random
 from dataclasses import dataclass, field
-from datetime import timedelta
 
 from chainofproof.scenarios.companions import MARKER, Pairing, fmt_ts
+from chainofproof.scenarios.gen_benign import benign_lines
+from chainofproof.scenarios.gen_conns import assign_ids, benign_conns, conn_lines
 from chainofproof.scenarios.gen_context import GenContext
-from chainofproof.scenarios.gen_links import link_lines
+from chainofproof.scenarios.gen_links import SYNTH, link_conns
+from chainofproof.scenarios.gen_vocab import HOSTS, host_ips
 
-USERS = ["a.rivera", "j.chen", "m.okafor", "s.novak", "t.haddad", "l.silva", "d.kim", "r.patel"]
-SHARES = ["Finance", "Public", "Home$", "Projects"]
-HOST_EVENTS = {
-    "WS-FIN-07": ["LOGON_SUCCESS", "LOGON_SUCCESS", "LOGOFF", "KERBEROS_TGS_REQUEST"],
-    "SRV-FILE-02": ["LOGON_SUCCESS", "SMB_SESSION_SETUP", "SMB_TREE_CONNECT", "SMB_TREE_CONNECT"],
-    "DC-01": [
-        "KERBEROS_TGT_REQUEST",
-        "KERBEROS_TGS_REQUEST",
-        "KERBEROS_TGS_REQUEST",
-        "LOGON_SUCCESS",
-        "LOGON_FAILURE",
-    ],
-}
+Keyed = list[tuple[str, dict[str, str], Pairing]]  # (tag, line, pairing)
 
 
 @dataclass
@@ -41,41 +31,12 @@ class AuthResult:
     link_seq: dict[str, int] = field(default_factory=dict)  # tag -> seq of each link line
 
 
-def _logon_id(rng: random.Random) -> str:
-    return f"0x{rng.randint(0x100000, 0xFFFFFF):016x}"
-
-
-def _benign(ctx: GenContext, host: str, count: int, rng: random.Random) -> list[dict[str, str]]:
-    lo = ctx.start - timedelta(hours=2)
-    out = []
-    for _ in range(count):
-        ev = rng.choice(HOST_EVENTS[host])
-        row = {
-            "ts": fmt_ts(lo + timedelta(seconds=rng.randint(0, 6 * 3600))),
-            "host": host,
-            "event": ev,
-            "user": rng.choice(USERS),
-            "src_ip": f"10.20.1.{rng.randint(10, 60)}",
-            "dst_host": host,
-        }
-        if ev.startswith("LOGON") and ev != "LOGOFF":
-            row["logon_type"] = str(rng.choice([2, 3, 3, 7, 10] if host == "WS-FIN-07" else [3]))
-        if ev in ("LOGON_SUCCESS", "LOGOFF", "SMB_SESSION_SETUP"):
-            row["logon_id"] = _logon_id(rng)
-        if ev == "SMB_TREE_CONNECT":
-            row["share"] = rng.choice(SHARES)
-        if ev == "KERBEROS_TGS_REQUEST":
-            row["service"] = rng.choice(["cifs", "ldap", "host"]) + "/" + host
-        out.append(row)
-    return out
-
-
-def _key_lines(ctx: GenContext, host: str) -> list[tuple[str, dict[str, str], Pairing]]:
+def _key_lines(ctx: GenContext, host: str) -> Keyed:
     """(tag, line, pairing) for lines that correspond to real key events (rule R1).
 
     S3 contributes no line: the real S3 file shows no network logon, so nothing is invented.
     """
-    ips = {h.hostname: h.ip for h in ctx.scenario.virtual_hosts}
+    ips = host_ips(ctx)
     if host == "WS-FIN-07":
         ev, t = ctx.first_key("S2", event_id=4624)
         lid = ev.facts["TargetLogonId"].lower()
@@ -108,7 +69,7 @@ def _key_lines(ctx: GenContext, host: str) -> list[tuple[str, dict[str, str], Pa
     return [("S5", line, pr)]
 
 
-def _pipe_lines(ctx: GenContext, host: str, ip: str) -> list[tuple[str, dict[str, str], Pairing]]:
+def _pipe_lines(ctx: GenContext, host: str, ip: str) -> Keyed:
     """One NAMED_PIPE_OPEN line per PsExec-style pipe the real S4 file shows being connected."""
     sk = ctx.inventory.keys_for("S4")
     pipes = sorted(
@@ -134,24 +95,42 @@ def _pipe_lines(ctx: GenContext, host: str, ip: str) -> list[tuple[str, dict[str
     return out
 
 
-def generate_auth(ctx: GenContext, host: str) -> AuthResult:
-    """Lines for one host, sorted by time, with contiguous per-host ``seq``."""
-    rng = ctx.rng(f"auth:{host}")
-    hosts = list(HOST_EVENTS)
-    total = ctx.scenario.noise.benign_auth_lines_total
-    count = total // len(hosts) + (1 if hosts.index(host) < total % len(hosts) else 0)
-    keyed = _key_lines(ctx, host) + link_lines(ctx, host)
-    pairings = {tag: pr for tag, _, pr in keyed}
-    items = [("", r) for r in _benign(ctx, host, count, rng)] + [(t, r) for t, r, _ in keyed]
-    items.sort(key=lambda it: it[1]["ts"])  # stable: key lines keep insertion order on ties
+def _assemble(host: str, plain: list[dict[str, str]], keyed: Keyed) -> AuthResult:
+    """Sort benign + key lines by time (ties by content, not by origin) and number them."""
+    items = [("", r, None) for r in plain] + [(t, r, p) for t, r, p in keyed]
+    items.sort(key=lambda it: (it[1]["ts"], sorted(it[1].items())))
     lines, key_seq, link_seq = [], {}, {}
-    for i, (tag, r) in enumerate(items, 1):  # seq is assigned after insertion, so it is contiguous
-        if tag:
-            k, _, v = pairings[tag].marker().partition("=")  # pair=<f>:<v> or synth_only=1
+    for i, (tag, r, pr) in enumerate(items, 1):  # seq is assigned after insertion: contiguous
+        if tag and pr is not None:
+            k, _, v = pr.marker().partition("=")  # pair=<f>:<v> or synth_only=1
             r = {**r, k: v}
             (link_seq if tag.startswith("LINK_") else key_seq)[tag] = i
         lines.append({"seq": f"{i:06d}", **r})
-    return AuthResult(lines, key_seq, pairings, link_seq)
+    return AuthResult(lines, key_seq, {t: p for t, _, p in keyed}, link_seq)
+
+
+def generate_all_auth(ctx: GenContext) -> dict[str, AuthResult]:
+    """Auth logs of all three hosts; connections (benign and key) are placed and numbered first."""
+    ips = host_ips(ctx)
+    keys = link_conns(ctx)
+    conns = keys + benign_conns(ctx, keys)
+    assign_ids(conns)
+    keyed = {h: _key_lines(ctx, h) for h in HOSTS}
+    plain: dict[str, list[dict[str, str]]] = {h: [] for h in HOSTS}
+    for c in conns:
+        src, dst = conn_lines(c, ips)
+        if c.tag:
+            keyed[c.src].append((f"{c.tag}:src", src, SYNTH))
+            keyed[c.dst].append((f"{c.tag}:dst", dst, SYNTH))
+        else:
+            plain[c.src].append(src)
+            plain[c.dst].append(dst)
+    total = ctx.scenario.noise.benign_auth_lines_total
+    for i, h in enumerate(HOSTS):
+        count = total // len(HOSTS) + (1 if i < total % len(HOSTS) else 0)
+        exclude = ctx.real_pipes.get(h, frozenset())
+        plain[h] += benign_lines(ctx, h, count, exclude)
+    return {h: _assemble(h, plain[h], keyed[h]) for h in HOSTS}
 
 
 def render_auth(ctx: GenContext, lines: list[dict[str, str]]) -> str:

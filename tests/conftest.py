@@ -30,13 +30,13 @@ def make_file(tmp_path):
     return _make
 
 
-# ---- the committed credtheft_lateral_v3 scenario, generated once per session ----------------
-V3_DIR = Path(__file__).resolve().parents[1] / "scenarios" / "credtheft_lateral_v3"
+# ---- the committed credtheft_lateral_v4 scenario, generated once per session ----------------
+V4_DIR = Path(__file__).resolve().parents[1] / "scenarios" / "credtheft_lateral_v4"
 
 
 @dataclass
-class V3Data:
-    """Committed v3 files plus both generated variants (no dataset needed)."""
+class V4Data:
+    """Committed v4 files plus both generated variants (no dataset needed)."""
 
     scn: Scenario
     inv: Inventory
@@ -55,20 +55,20 @@ class V3Data:
 
 
 @pytest.fixture(scope="session")
-def v3(tmp_path_factory) -> V3Data:
-    scn = load_scenario(V3_DIR / "scenario.yaml")
-    inv = load_inventory(V3_DIR / "inventory.json")
-    insp = json.loads((V3_DIR / "field_inspection.json").read_text(encoding="utf-8"))
-    keys = {v: load_key(V3_DIR / f"key_{v.value}.yaml", scn) for v in Variant}
+def v4(tmp_path_factory) -> V4Data:
+    scn = load_scenario(V4_DIR / "scenario.yaml")
+    inv = load_inventory(V4_DIR / "inventory.json")
+    insp = json.loads((V4_DIR / "field_inspection.json").read_text(encoding="utf-8"))
+    keys = {v: load_key(V4_DIR / f"key_{v.value}.yaml", scn) for v in Variant}
     dirs = {}
     for v in Variant:
-        dirs[v] = tmp_path_factory.mktemp(f"v3_{v.value}")
+        dirs[v] = tmp_path_factory.mktemp(f"v4_{v.value}")
         generate_variant(scn, inv, v, dirs[v])
-    return V3Data(scn, inv, insp, keys, dirs)
+    return V4Data(scn, inv, insp, keys, dirs)
 
 
-def synthetic_env(base: Path, v3: V3Data, files: tuple[str, ...] | None = None):
-    """Paths with both v3 cases holding the SYNTHETIC companion files, normalized (no Hayabusa)."""
+def synthetic_env(base: Path, v4: V4Data, files: tuple[str, ...] | None = None):
+    """Paths with both v4 cases holding the SYNTHETIC companion files, normalized (no Hayabusa)."""
     from chainofproof.ingest.ingest import ingest_evidence
     from chainofproof.ingest.store import EvidenceStore
     from chainofproof.tools.case_run import normalize_case
@@ -78,9 +78,9 @@ def synthetic_env(base: Path, v3: V3Data, files: tuple[str, ...] | None = None):
     store = EvidenceStore(paths)
     rows = {}
     for v in Variant:
-        case = f"{v3.scn.scenario_id}_{v.value}"
-        store.create_case(case, "t", f"{v3.scn.scenario_id} ({v.value})")
-        for f in sorted(v3.dirs[v].iterdir()):
+        case = f"{v4.scn.scenario_id}_{v.value}"
+        store.create_case(case, "t", f"{v4.scn.scenario_id} ({v.value})")
+        for f in sorted(v4.dirs[v].iterdir()):
             if f.suffix in (".csv", ".log") and (files is None or f.name in files):
                 ingest_evidence(paths, case, f)
         rows[case] = normalize_case(paths, case, hayabusa=False)
@@ -88,6 +88,6 @@ def synthetic_env(base: Path, v3: V3Data, files: tuple[str, ...] | None = None):
 
 
 @pytest.fixture(scope="session")
-def synth_norm(v3, tmp_path_factory):
-    """Both v3 variants, synthetic sources only, normalized once per session."""
-    return synthetic_env(tmp_path_factory.mktemp("norm") / "base", v3)
+def synth_norm(v4, tmp_path_factory):
+    """Both v4 variants, synthetic sources only, normalized once per session."""
+    return synthetic_env(tmp_path_factory.mktemp("norm") / "base", v4)

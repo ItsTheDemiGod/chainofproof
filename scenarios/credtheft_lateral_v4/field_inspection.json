@@ -1,6 +1,6 @@
 {
   "note": "metadata only; see docs/scenarios.md",
-  "scenario_id": "credtheft_lateral_v3",
+  "scenario_id": "credtheft_lateral_v4",
   "sources": {
     "d1_winlogon_persist": {
       "event_id_counts": {

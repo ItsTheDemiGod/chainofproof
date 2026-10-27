@@ -1,4 +1,4 @@
-"""Normalizer on the SYNTHETIC v3 sources: labels, uids, determinism, versioning, perturbations."""
+"""Normalizer on the SYNTHETIC v4 sources: labels, uids, determinism, versioning, perturbations."""
 
 import re
 import sqlite3
@@ -18,7 +18,7 @@ from chainofproof.tools import query
 from chainofproof.tools.normalize import NormalizationError, normalize_evidence
 from conftest import synthetic_env
 
-CLEAN, PERT = "credtheft_lateral_v3_clean", "credtheft_lateral_v3_perturbed"
+CLEAN, PERT = "credtheft_lateral_v4_clean", "credtheft_lateral_v4_perturbed"
 FMT = "%Y-%m-%dT%H:%M:%S.%fZ"
 SYNTH_KEYS = [
     "fs_ws_fin_07", "fs_srv_file_02", "fs_dc_01",
@@ -38,8 +38,8 @@ def day_gap(fields):
     return (fn - si).days
 
 
-def one_file_env(v3, tmp_path):
-    paths, _ = synthetic_env(tmp_path / "b", v3, files=("auth_ws_fin_07.log",))
+def one_file_env(v4, tmp_path):
+    paths, _ = synthetic_env(tmp_path / "b", v4, files=("auth_ws_fin_07.log",))
     (rec,) = EvidenceStore(paths).list_evidence(CLEAN)
     return paths, rec
 
@@ -68,29 +68,32 @@ def test_event_uids_unique_and_shared_for_identical_files(synth_norm):
         assert sorted(clean.by_source(sk)) == sorted(pert.by_source(sk)) != []
 
 
-def test_perturbations_are_not_corrected(synth_norm):
+def test_perturbations_are_not_corrected(synth_norm, v4):
     paths, _ = synth_norm
     clean, pert = build_index(paths, CLEAN), build_index(paths, PERT)
+    cons = {c.kind.value: c for c in v4.keys[Variant.perturbed].contradictions}
     # clock skew: every SRV-FILE-02 auth line is 420 s later in the perturbed variant
     seqs = sorted(r for (sk, r) in pert.by_ref if sk == "auth_srv_file_02")
-    assert len(seqs) == 272
+    assert len(seqs) == cons["clock_skew"].params["lines_shifted"]
     deltas = {
         int((ts(pert, "auth_srv_file_02", s) - ts(clean, "auth_srv_file_02", s)).total_seconds())
         for s in seqs
     }
     assert deltas == {420}
     # timestomp: si_created days earlier than fn_created (perturbed), equal (clean)
-    for rid in (272, 339):
-        p = pert.row(pert.uids("fs_srv_file_02", rid)[0])["fields"]
-        c = clean.row(clean.uids("fs_srv_file_02", rid)[0])["fields"]
+    for f in cons["timestomp"].params["files"]:
+        p = pert.row(pert.uids("fs_srv_file_02", f["record_id"])[0])["fields"]
+        c = clean.row(clean.uids("fs_srv_file_02", f["record_id"])[0])["fields"]
         assert day_gap(p) >= 1000 and day_gap(c) == 0
     # removed DC-01 lines stay missing
-    assert not any(pert.uids("auth_dc_01", s) for s in range(144, 157))
-    assert all(clean.uids("auth_dc_01", s) for s in range(144, 157))
+    gap = cons["log_gap"].params
+    removed = range(gap["first_removed_seq"], gap["last_removed_seq"] + 1)
+    assert not any(pert.uids("auth_dc_01", s) for s in removed)
+    assert all(clean.uids("auth_dc_01", s) for s in removed)
 
 
-def test_determinism_and_versioning_without_deletions(v3, tmp_path):
-    paths, rec = one_file_env(v3, tmp_path)
+def test_determinism_and_versioning_without_deletions(v4, tmp_path):
+    paths, rec = one_file_env(v4, tmp_path)
     with closing(sqlite3.connect(paths.db_path)) as con:
         run_id, n = con.execute(
             "SELECT run_id, event_count FROM norm_runs WHERE evidence_id = ?", [rec.evidence_id]
@@ -109,8 +112,8 @@ def test_determinism_and_versioning_without_deletions(v3, tmp_path):
     assert query.search_events(paths, CLEAN, limit=1).total_matches == n  # only the latest run
 
 
-def test_uid_collision_is_a_hard_error(v3, tmp_path, monkeypatch):
-    paths, rec = one_file_env(v3, tmp_path)
+def test_uid_collision_is_a_hard_error(v4, tmp_path, monkeypatch):
+    paths, rec = one_file_env(v4, tmp_path)
     real = norm.PARSERS[SourceKindName.auth_log]
 
     def doubled(path, ctx):
@@ -126,18 +129,18 @@ def test_uid_collision_is_a_hard_error(v3, tmp_path, monkeypatch):
 def test_resolve_source_keys(synth_norm):
     paths, _ = synth_norm
     assert sorted(resolve_source_keys(paths, CLEAN).values()) == sorted(SYNTH_KEYS)
-    assert split_case_id(PERT) == ("credtheft_lateral_v3", Variant.perturbed)
+    assert split_case_id(PERT) == ("credtheft_lateral_v4", Variant.perturbed)
 
 
 @pytest.mark.parametrize(
-    "bad", ["credtheft_lateral_v3", "credtheft_lateral_v3_other", "nope_clean"]
+    "bad", ["credtheft_lateral_v4", "credtheft_lateral_v4_other", "nope_clean"]
 )
 def test_case_id_must_match_a_scenario_and_variant(bad):
     with pytest.raises(ScenarioError, match="not <scenario_id>_<variant>"):
         split_case_id(bad)
 
 
-def test_resolve_refuses_unknown_and_wrong_variant_files(v3, tmp_path, paths):
+def test_resolve_refuses_unknown_and_wrong_variant_files(v4, tmp_path, paths):
     store = EvidenceStore(paths)
     store.create_case(CLEAN)
     with pytest.raises(ScenarioError, match="has no evidence"):
@@ -152,8 +155,8 @@ def test_resolve_refuses_unknown_and_wrong_variant_files(v3, tmp_path, paths):
         resolve_source_keys(paths, "other_case")
 
 
-def test_perturbed_file_is_not_a_clean_variant_file(v3, paths):
+def test_perturbed_file_is_not_a_clean_variant_file(v4, paths):
     EvidenceStore(paths).create_case(CLEAN)
-    ingest_evidence(paths, CLEAN, v3.dirs[Variant.perturbed] / "auth_dc_01.log")
+    ingest_evidence(paths, CLEAN, v4.dirs[Variant.perturbed] / "auth_dc_01.log")
     with pytest.raises(ScenarioError, match="not part of"):
         resolve_source_keys(paths, CLEAN)

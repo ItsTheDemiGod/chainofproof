@@ -9,11 +9,12 @@ from pathlib import Path
 import pytest
 
 from chainofproof.eval.gt_link import build_index, key_action_refs, resolve_ref
+from chainofproof.schemas.scenario import Variant
 from chainofproof.tools import query
 from leakage import scan
 
 SRC = Path(__file__).resolve().parents[1] / "src" / "chainofproof"
-CLEAN, PERT = "credtheft_lateral_v3_clean", "credtheft_lateral_v3_perturbed"
+CLEAN, PERT = "credtheft_lateral_v4_clean", "credtheft_lateral_v4_perturbed"
 
 
 def test_limit_defaults_and_hard_maximum(synth_norm):
@@ -29,20 +30,25 @@ def test_limit_defaults_and_hard_maximum(synth_norm):
     assert last.returned == 3 and not last.truncated
 
 
-def test_filters_and_ordering(synth_norm):
+def test_filters_and_ordering(synth_norm, v4):
     paths, _ = synth_norm
+    links = {k.id: k for k in v4.keys[Variant.clean].links}
+    conn_a = links["GT-LNK-002"].evidence_refs[0].conn_id
+    conn_b = links["GT-LNK-004"].evidence_refs[0].conn_id
     page = query.search_events(paths, CLEAN, event_type="auth_conn", limit=50)
-    assert page.total_matches == 3 and {e.conn_id for e in page.events} == {"CONN-001", "CONN-002"}
+    assert page.total_matches > 100 and page.truncated  # benign connections are in the log too
     stamps = [e.timestamp for e in page.events]
     assert stamps == sorted(stamps)
-    one = query.search_events(paths, CLEAN, conn_id="CONN-001", event_type="auth_logon")
+    ends = query.search_events(paths, CLEAN, conn_id=conn_b, event_type="auth_conn")
+    assert ends.total_matches == 2 and {e.conn_id for e in ends.events} == {conn_b}
+    one = query.search_events(paths, CLEAN, conn_id=conn_a, event_type="auth_logon")
     assert one.total_matches == 1 and one.events[0].user == "user01"
     assert query.get_event(paths, CLEAN, one.events[0].event_uid) == one.events[0]
     assert query.get_event(paths, CLEAN, "EVT-000000000000") is None
     t = one.events[0].timestamp
     win = query.timeline_window(paths, CLEAN, "SRV-FILE-02", t, t)
     assert win.total_matches >= 1 and all(e.timestamp == t for e in win.events)
-    txt = query.search_events(paths, CLEAN, text="CONN-002", limit=50)
+    txt = query.search_events(paths, CLEAN, text=conn_b, limit=50)
     assert txt.total_matches >= 2
     assert query.search_events(paths, CLEAN, text="100%_[x]").total_matches == 0  # wildcards inert
 
@@ -84,9 +90,9 @@ def test_query_results_never_carry_eval_fields(synth_norm):
 
 
 @pytest.mark.parametrize("case", [CLEAN, PERT])
-def test_no_leakage_in_full_agent_view_dump(synth_norm, v3, case):
+def test_no_leakage_in_full_agent_view_dump(synth_norm, v4, case):
     paths, _ = synth_norm
-    rep = scan(paths, case, [s.source_key for s in v3.scn.sources])
+    rep = scan(paths, case, [s.source_key for s in v4.scn.sources])
     assert rep.rows > 1000 and rep.strict == []
 
 
@@ -134,13 +140,13 @@ def test_agent_modules_do_not_load_eval_or_scenarios_at_import_time(module):
 
 
 # ---- gt_link on the synthetic sources ----------------------------------------------------------
-def test_gt_link_resolves_synthetic_key_refs(synth_norm, v3):
+def test_gt_link_resolves_synthetic_key_refs(synth_norm, v4):
     paths, _ = synth_norm
     from chainofproof.schemas.scenario import Variant
 
     for variant, case in ((Variant.clean, CLEAN), (Variant.perturbed, PERT)):
-        idx, key = build_index(paths, case), v3.keys[variant]
-        synthetic = {s.source_key for s in v3.scn.sources if s.is_synthetic}
+        idx, key = build_index(paths, case), v4.keys[variant]
+        synthetic = {s.source_key for s in v4.scn.sources if s.is_synthetic}
         refs = [(o, r) for o, r in key_action_refs(key) if r.source_key in synthetic]
         assert refs and all(resolve_ref(idx, r) for _, r in refs)
         for ln in key.links:

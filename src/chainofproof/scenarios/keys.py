@@ -40,6 +40,10 @@ SYNTH_REFS = {
 }
 # what the real events support, per (stage, technique); anything else is not asserted
 DESCRIPTIONS = {
+    ("S1", "T1003.001"): (
+        "A Mimikatz binary reads LSASS memory (Sysmon 10). The SYNTHETIC credential-dump output "
+        "file (synthetic_only) deliberately has an innocuous, document-like name and location."
+    ),
     ("S2", LOG_CLEARED_TECHNIQUE): (
         "Security audit log cleared (EventID 1102) about 4.4 s before the new-credentials logon "
         "on the same host."
@@ -89,7 +93,7 @@ MISSING = [
         "5145 and no ADMIN$ file copy exist for the remote service creation on SRV-FILE-02, and "
         "the real S5 4662 events show no source address. The real S3 file shows only the ntsvcs "
         "pipe, an inbound TCP 445 connection and the service/PowerShell activity. The SYNTHETIC "
-        "synth_only cross-host lines (CONN-001, CONN-002) stand in for this evidence; they are "
+        "synth_only cross-host lines ({conns}) stand in for this evidence; they are "
         "not proof that it exists in the real captures.",
         "S3/S5: which account authenticated, from which host, and that an admin share was used",
     ),
@@ -195,7 +199,11 @@ def build_key(scenario: Scenario, inv: Inventory, variant: Variant, gen: GenResu
         injections=[],
         links=build_links(scenario, inv, gen),
         missing_evidence=[
-            GroundTruthMissingEvidence(id=f"GT-MIS-{i:03d}", description=d, confirms_claim=c)
+            GroundTruthMissingEvidence(
+                id=f"GT-MIS-{i:03d}",
+                description=d.replace("{conns}", ", ".join(gen.link_conn.values())),
+                confirms_claim=c,
+            )
             for i, (d, c) in enumerate(MISSING, 1)
         ],
         generated_file_hashes=dict(sorted(gen.hashes.items())),

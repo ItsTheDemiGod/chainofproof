@@ -18,6 +18,7 @@ from typing import Any
 
 from chainofproof.scenarios.evtx_meta import EvtxEvent, iter_events
 from chainofproof.scenarios.inventory import INSTRUCTION_LIKE
+from chainofproof.schemas.scenario import Scenario
 
 MAX_NAME = 200
 SYSMON = "Microsoft-Windows-Sysmon/Operational"
@@ -150,3 +151,20 @@ def load_known_events(path: Path) -> dict[str, dict[int, int]]:
         for k, v in data["sources"].items()
         if "events" in v
     }
+
+
+def load_real_pipes(path: Path, scenario: Scenario) -> dict[str, frozenset[str]]:
+    """virtual host -> lower-case pipe names of the REAL events mapped to it (names only).
+
+    Read from field_inspection.json through the scenario's host aliases; a missing file gives {}.
+    """
+    if not Path(path).is_file():
+        return {}
+    out: dict[str, set[str]] = {}
+    for key, src in json.loads(Path(path).read_text(encoding="utf-8"))["sources"].items():
+        aliases = scenario.aligned(key).host_aliases
+        for e in src.get("events", []):
+            host = aliases.get(e.get("computer", ""))
+            if host and e.get("pipe_name"):
+                out.setdefault(host, set()).add(e["pipe_name"].lstrip("\\").lower())
+    return {h: frozenset(p) for h, p in out.items()}

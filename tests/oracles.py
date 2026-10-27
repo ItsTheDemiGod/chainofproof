@@ -181,29 +181,58 @@ def _check_real_in_gap(c: Case) -> bool:
     )
 
 
+def expected_pair_deltas(lines: list[dict[str, str]], host: str, shift: int) -> dict[str, int]:
+    """conn_id -> delta after ``host`` is shifted: +shift if it holds the destination end, -shift
+    if it holds the source end, 0 otherwise (cross-host connections only)."""
+    out = {}
+    for cid, e in _connection_ends(lines).items():
+        if {"source", "dest"} <= set(e) and e["source"]["host"] != e["dest"]["host"]:
+            out[cid] = shift * ((e["dest"]["host"] == host) - (e["source"]["host"] == host))
+    return out
+
+
+def _deltas_as_expected(
+    clean_lines: list[dict[str, str]], pert: dict[str, int], host: str, shift: int
+) -> bool:
+    """Perturbed pair deltas equal the expectation for every connection that still has both ends
+    (the gap removed one end of some; those are not pairs any more)."""
+    want = expected_pair_deltas(clean_lines, host, shift)
+    return set(pert) <= set(want) and all(pert[k] == want[k] for k in pert)
+
+
 def _check_cross_pair(c: Case) -> bool:
     pairs = c.claim.params["cross_host_pairs"]
-    clean = oracle_cross_host_pair_delta(all_auth_lines(c.clean))
+    shift = int(c.claim.magnitude)
+    clean_lines = all_auth_lines(c.clean)
+    clean = oracle_cross_host_pair_delta(clean_lines)
     pert = oracle_cross_host_pair_delta(all_auth_lines(c.perturbed))
     want = {p["conn_id"]: p["perturbed_delta_seconds"] for p in pairs}
     return (
         bool(pairs)
         and set(clean.values()) == {0}  # clean: every connection has both ends, 0 s apart
         and {p["conn_id"]: p["clean_delta_seconds"] for p in pairs} == {k: 0 for k in want}
-        and pert == want  # perturbed: exactly the planted pair(s), at the key's magnitude
-        and set(want.values()) == {int(c.claim.magnitude)}
+        # perturbed: the skewed host's connections (benign ones included) move by +/- the shift
+        and _deltas_as_expected(clean_lines, pert, c.claim.params["host"], shift)
+        and all(pert[k] == v for k, v in want.items())  # the planted pair at the key's magnitude
+        and set(want.values()) == {shift}
     )
 
 
 def _check_unmatched(c: Case) -> bool:
     want = c.claim.params["unmatched_connections"]
     found = oracle_unmatched_connections(all_auth_lines(c.perturbed))
-    got = [(f["conn_id"], f["present_side"], _auth_key(f["host"]), f["seq"]) for f in found]
-    exp = [
-        (w["conn_id"], w["present_side"], w["present"]["source_key"], w["present"]["seq"])
+    got = {f["conn_id"]: (f["present_side"], _auth_key(f["host"]), f["seq"]) for f in found}
+    exp = {
+        w["conn_id"]: (w["present_side"], w["present"]["source_key"], w["present"]["seq"])
         for w in want
-    ]
-    return oracle_unmatched_connections(all_auth_lines(c.clean)) == [] and got == exp and bool(exp)
+    }
+    collateral = set(c.claim.expected_collateral_conn_ids)
+    return (
+        oracle_unmatched_connections(all_auth_lines(c.clean)) == []
+        and bool(exp)
+        and {k: got[k] for k in exp} == exp  # the planted connection, exactly as the key says
+        and set(got) == set(exp) | collateral  # nothing else is one-ended
+    )
 
 
 def _auth_key(host: str) -> str:

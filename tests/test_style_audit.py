@@ -1,4 +1,4 @@
-"""Style audit logic on small fixtures, plus the audit on the synthetic v3 sources."""
+"""Style audit logic on small fixtures, plus the audit on the synthetic v4 sources."""
 
 from chainofproof.eval.style_audit import (
     Audit,
@@ -8,7 +8,7 @@ from chainofproof.eval.style_audit import (
     verdict,
 )
 
-CLEAN, PERT = "credtheft_lateral_v3_clean", "credtheft_lateral_v3_perturbed"
+CLEAN, PERT = "credtheft_lateral_v4_clean", "credtheft_lateral_v4_perturbed"
 
 
 def rows(values, key="v"):

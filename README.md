@@ -56,8 +56,10 @@ Set `CHAINOFPROOF_BASE_DIR` to use a throwaway data root instead of `data/`.
 | `eval-coverage CASE_ID... [--baseline-md FILE]` | EVAL ONLY: answer-key coverage, count/alignment checks, Hayabusa-only baseline |
 
 Datasets live in `data/downloads/` (gitignored); see `docs/scenarios.md`. The current scenario is
-`credtheft_lateral_v3`: real EVTX captures plus labeled SYNTHETIC companions, including a few
-`synth_only` cross-host connection lines (`conn_id`) and the link ground truth (`GT-LNK`); see
-"Cross-host links" in `docs/scenarios.md`.
+`credtheft_lateral_v4`: real EVTX captures plus labeled SYNTHETIC companions, including two
+`synth_only` cross-host key connections (`conn_id`, time-ordered ids shared with about 90 benign
+connection pairs) and the link ground truth (`GT-LNK`); the benign background shares the key lines'
+vocabulary (Phase 4.1). v1, v2 and v3 are superseded (their cases stay in the database as history).
+See "Cross-host links" and "Scenario v4" in `docs/scenarios.md` and `docs/style_audit.md`.
 
 Tamper demo (temp dir only): `.venv\Scripts\python.exe scripts\demo_tamper.py`

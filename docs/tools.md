@@ -47,11 +47,11 @@ tools_bin/hayabusa/hayabusa-4.2.0-win-x64.exe dfir-timeline -f <working copy> -o
 
 ```
 .venv\Scripts\python.exe -m chainofproof tools-check
-.venv\Scripts\python.exe -m chainofproof normalize credtheft_lateral_v3_clean
-.venv\Scripts\python.exe -m chainofproof normalize credtheft_lateral_v3_perturbed
-.venv\Scripts\python.exe -m chainofproof events-stats credtheft_lateral_v3_clean
-.venv\Scripts\python.exe -m chainofproof events-show credtheft_lateral_v3_clean --host DC-01 --limit 10
-.venv\Scripts\python.exe -m chainofproof eval-coverage credtheft_lateral_v3_clean credtheft_lateral_v3_perturbed --baseline-md docs/hayabusa_baseline.md
+.venv\Scripts\python.exe -m chainofproof normalize credtheft_lateral_v4_clean
+.venv\Scripts\python.exe -m chainofproof normalize credtheft_lateral_v4_perturbed
+.venv\Scripts\python.exe -m chainofproof events-stats credtheft_lateral_v4_clean
+.venv\Scripts\python.exe -m chainofproof events-show credtheft_lateral_v4_clean --host DC-01 --limit 10
+.venv\Scripts\python.exe -m chainofproof eval-coverage credtheft_lateral_v4_clean credtheft_lateral_v4_perturbed --baseline-md docs/hayabusa_baseline.md
 .venv\Scripts\python.exe -m chainofproof ledger-verify
 ```
 

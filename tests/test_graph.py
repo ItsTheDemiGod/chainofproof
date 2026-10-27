@@ -8,10 +8,11 @@ from chainofproof.custody.ledger import Ledger
 from chainofproof.graph import entities as en
 from chainofproof.graph.builder import build_graph
 from chainofproof.graph.export import export_graph, graph_bytes
+from chainofproof.schemas.scenario import Variant
 from chainofproof.tools import graph_query as gq
 from evfactory import auth, ev
 
-CLEAN, PERT = "credtheft_lateral_v3_clean", "credtheft_lateral_v3_perturbed"
+CLEAN, PERT = "credtheft_lateral_v4_clean", "credtheft_lateral_v4_perturbed"
 FORBIDDEN = ("source_key", "synth_only", "pair=", "SYNTHETIC", "GT-", "is_synthetic", "raw_note")
 
 
@@ -179,8 +180,11 @@ def test_export_graph_records_run_and_ledger(synth_norm):
     assert e.output_hash == a.graph_sha256 and e.input_hashes and "RUN-" in e.command
 
 
-def test_query_tools_bounded_and_without_eval_data(synth_norm):
+def test_query_tools_bounded_and_without_eval_data(synth_norm, v4):
     paths, _ = synth_norm
+    links_key = {k.id: k for k in v4.keys[Variant.perturbed].links}
+    conn_a = links_key["GT-LNK-002"].evidence_refs[0].conn_id
+    conn_b = links_key["GT-LNK-004"].evidence_refs[0].conn_id
     s = gq.graph_stats(paths, PERT)
     assert s.nodes_by_type["host"] == 3 and s.edges_by_relation["connected_to"] >= 1
     page = gq.neighbors(paths, PERT, "host:SRV-FILE-02")
@@ -192,8 +196,13 @@ def test_query_tools_bounded_and_without_eval_data(synth_norm):
     assert ent.type == "host" and ent.event_uids and len(ent.event_uids) <= 50
     links = gq.host_links(paths, PERT)
     pairs = {(x.from_host, x.to_host): x.conn_ids for x in links.links}
-    assert pairs[("WS-FIN-07", "SRV-FILE-02")] == ["CONN-001"]
-    assert pairs[("SRV-FILE-02", "DC-01")] == ["CONN-002"]
+    # v4: the key links are two of many connections between the logged hosts (ids are time-ordered)
+    assert (
+        conn_a in pairs[("WS-FIN-07", "SRV-FILE-02")]
+        and len(pairs[("WS-FIN-07", "SRV-FILE-02")]) > 5
+    )
+    assert conn_b in pairs[("SRV-FILE-02", "DC-01")] and len(pairs[("SRV-FILE-02", "DC-01")]) > 5
+    assert ("DC-01", "WS-FIN-07") not in pairs  # benign connections never start on the DC
     blob = " ".join(x.model_dump_json() for x in (s, page, only, ent, links))
     assert not [bad for bad in FORBIDDEN if bad in blob]
 
@@ -204,7 +213,11 @@ def test_find_paths_hops_and_limits(synth_norm):
     assert r.returned >= 1 and all(len(p.nodes) - 1 <= 4 for p in r.paths)
     assert r.paths[0].nodes[0] == "host:WS-FIN-07" and r.paths[0].nodes[-1] == "host:DC-01"
     assert r.paths[0].hops[0].event_uids
-    assert gq.find_paths(paths, PERT, "host:WS-FIN-07", "host:DC-01", max_hops=1).returned == 0
+    # v4: workstations also talk to the DC directly (benign kerberos/ldap), so one hop exists ...
+    assert gq.find_paths(paths, PERT, "host:WS-FIN-07", "host:DC-01", max_hops=1).returned == 1
+    # ... plus longer routes (the lateral one through the file server is in the host_links test)
+    two = gq.find_paths(paths, PERT, "host:WS-FIN-07", "host:DC-01", max_hops=2)
+    assert two.returned > 1
     assert gq.find_paths(paths, PERT, "host:WS-FIN-07", "host:DC-01", max_hops=99).max_hops == 4
     many = gq.find_paths(paths, PERT, "host:WS-FIN-07", "host:DC-01", max_paths=99)
     assert many.returned <= 10

@@ -14,6 +14,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from chainofproof.ingest.sanitize import DEFAULT_MAX, FIELD_MAX, clean, sanitize
+from chainofproof.schemas.common import CONN_ID_PATTERN
 from chainofproof.schemas.events import EventEvalMeta, EventType, NormalizedEvent
 from chainofproof.tools.fs_timeline_parser import content_lines, split_note
 from chainofproof.tools.parse_common import (
@@ -27,7 +28,7 @@ from chainofproof.tools.parse_common import (
 
 REQUIRED = ("seq", "ts", "host", "event")
 _TS = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
-_CONN = re.compile(r"^CONN-\d{3}$")
+_CONN = re.compile(CONN_ID_PATTERN)
 MAPPED = {"seq", "ts", "host", "event", "user", "src_ip", "dst_host", "logon_type", "logon_id",
           "conn_id", "pipe", "synth_only", "pair"}  # fmt: skip
 

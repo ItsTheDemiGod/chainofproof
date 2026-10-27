@@ -1,10 +1,11 @@
 """Phase 2.2: cross-host synthetic links, link ground truth, and the checks the key claims.
 
-Every test runs on the small fixture scenario AND on the committed credtheft_lateral_v3 files
+Every test runs on the small fixture scenario AND on the committed credtheft_lateral_v4 files
 (generated into a temp dir; no EVTX dataset needed).
 """
 
 import json
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -51,10 +52,10 @@ class World:
     keys: dict[Variant, AnswerKey]
 
 
-@pytest.fixture(scope="module", params=["fixture", "v3"])
-def world(request, tmp_path_factory, v3) -> World:
-    if request.param == "v3":
-        return World(v3.scn, v3.inv, v3.dirs, v3.keys)
+@pytest.fixture(scope="module", params=["fixture", "v4"])
+def world(request, tmp_path_factory, v4) -> World:
+    if request.param == "v4":
+        return World(v4.scn, v4.inv, v4.dirs, v4.keys)
     root = tmp_path_factory.mktemp("links")
     scn, inv, _, _ = build_fixture(root)
     dirs, keys = {}, {}
@@ -72,49 +73,59 @@ def _by_conn(world: World, variant: Variant) -> dict[str, list[dict[str, str]]]:
     return out
 
 
+def link_ids(world: World) -> tuple[str, str]:
+    """(conn_id of GT-LNK-002, conn_id of GT-LNK-004), read from the clean key."""
+    links = {k.id: k for k in world.keys[Variant.clean].links}
+    return (
+        links["GT-LNK-002"].evidence_refs[0].conn_id,
+        links["GT-LNK-004"].evidence_refs[0].conn_id,
+    )
+
+
+def collateral(world: World) -> list[str]:
+    """expected_collateral_conn_ids of the perturbed key's log gap."""
+    gap = next(c for c in world.keys[Variant.perturbed].contradictions if c.kind == "log_gap")
+    return gap.expected_collateral_conn_ids
+
+
 # ---- R1 and parsers -------------------------------------------------------------------------
 @pytest.mark.parametrize("variant", list(Variant))
-def test_every_link_line_is_synth_only_or_paired(world, variant):
-    lines = [ln for ln in all_auth_lines(world.dirs[variant]) if "conn_id" in ln]
-    assert lines  # parsers read conn_id
+def test_only_the_key_links_carry_markers_benign_connections_carry_none(world, variant):
+    lines = all_auth_lines(world.dirs[variant])
+    conn_lines = [ln for ln in lines if "conn_id" in ln]
+    assert len(conn_lines) > 100  # benign pairs plus the two key links
+    marked = [ln for ln in conn_lines if row_marker(ln) is not None]
+    assert {ln["conn_id"] for ln in marked} <= set(link_ids(world))
+    for ln in marked:
+        assert row_marker(ln) is True and "pair" not in ln  # synth_only, never paired
     for ln in lines:
-        assert row_marker(ln) is True or isinstance(row_marker(ln), tuple), ln["seq"]
-        assert ln["conn_id"].startswith("CONN-")
-    # no other line carries a synth_only marker or claims to be a connection end
-    for ln in all_auth_lines(world.dirs[variant]):
-        if "conn_id" not in ln:
+        assert re.fullmatch(r"CONN-\d{4}", ln.get("conn_id", "CONN-0001"))
+        if "conn_id" not in ln:  # no other line claims to be a connection end
             assert ln["event"] not in ("CONN_OUT", "CONN_ACCEPTED")
             assert row_marker(ln) is not True
 
 
-def test_link_lines_are_all_synth_only_in_this_design(world):
-    for ln in all_auth_lines(world.dirs[Variant.clean]):
-        if "conn_id" in ln:
-            assert row_marker(ln) is True and "pair" not in ln
-
-
 def test_parser_reads_marker_and_conn_id_and_rejects_bad_conn_id():
-    ok = "seq=1 ts=2024-03-12T09:00:00Z host=H event=CONN_OUT conn_id=CONN-007 synth_only=1"
+    ok = "seq=1 ts=2024-03-12T09:00:00Z host=H event=CONN_OUT conn_id=CONN-0007 synth_only=1"
     row = parse_auth_text(ok)[0]
-    assert row["conn_id"] == "CONN-007" and row_marker(row) is True
-    with pytest.raises(CompanionParseError, match="conn_id"):
-        parse_auth_text(ok.replace("CONN-007", "C7"))
+    assert row["conn_id"] == "CONN-0007" and row_marker(row) is True
+    for bad in ("C7", "CONN-007", "CONN-00007"):  # one pattern: CONN- and exactly four digits
+        with pytest.raises(CompanionParseError, match="conn_id"):
+            parse_auth_text(ok.replace("CONN-0007", bad))
 
 
-# ---- the two connections --------------------------------------------------------------------
+# ---- the connections ------------------------------------------------------------------------
 def test_clean_both_ends_exist_and_delta_is_zero(world):
     clean = _by_conn(world, Variant.clean)
-    assert sorted(clean) == ["CONN-001", "CONN-002"]
+    assert set(link_ids(world)) <= set(clean) and len(clean) >= 60
     assert all(len(v) == 2 for v in clean.values())
-    assert oracle_cross_host_pair_delta(all_auth_lines(world.dirs[Variant.clean])) == {
-        "CONN-001": 0,
-        "CONN-002": 0,
-    }
+    deltas = oracle_cross_host_pair_delta(all_auth_lines(world.dirs[Variant.clean]))
+    assert set(deltas) == set(clean) and set(deltas.values()) == {0}
     assert oracle_unmatched_connections(all_auth_lines(world.dirs[Variant.clean])) == []
 
 
 def test_clean_link_a_shape(world):
-    a = {ln["event"]: ln for ln in _by_conn(world, Variant.clean)["CONN-001"]}
+    a = {ln["event"]: ln for ln in _by_conn(world, Variant.clean)[link_ids(world)[0]]}
     src, dst = a["CONN_OUT"], a["LOGON_SUCCESS"]
     assert (src["host"], src["dst_host"], src["service"]) == ("WS-FIN-07", "SRV-FILE-02", "smb")
     assert (dst["host"], dst["user"], dst["logon_type"]) == ("SRV-FILE-02", "user01", "3")
@@ -122,7 +133,7 @@ def test_clean_link_a_shape(world):
 
 
 def test_clean_link_b_shape(world):
-    b = {ln["event"]: ln for ln in _by_conn(world, Variant.clean)["CONN-002"]}
+    b = {ln["event"]: ln for ln in _by_conn(world, Variant.clean)[link_ids(world)[1]]}
     src, dst = b["CONN_OUT"], b["CONN_ACCEPTED"]
     assert (src["host"], src["dst_host"], src["service"]) == ("SRV-FILE-02", "DC-01", "drsuapi")
     assert (dst["host"], dst["service"]) == ("DC-01", "drsuapi")
@@ -131,16 +142,25 @@ def test_clean_link_b_shape(world):
 
 def test_perturbed_link_a_delta_is_exactly_420(world):
     lines = all_auth_lines(world.dirs[Variant.perturbed])
-    assert oracle_cross_host_pair_delta(lines) == {"CONN-001": 420}
+    assert oracle_cross_host_pair_delta(lines)[link_ids(world)[0]] == 420
 
 
 def test_perturbed_link_b_destination_absent_source_present(world):
-    b = _by_conn(world, Variant.perturbed)["CONN-002"]
+    conn_b = link_ids(world)[1]
+    b = _by_conn(world, Variant.perturbed)[conn_b]
     assert [(ln["host"], ln["event"]) for ln in b] == [("SRV-FILE-02", "CONN_OUT")]
     un = oracle_unmatched_connections(all_auth_lines(world.dirs[Variant.perturbed]))
-    assert [(u["conn_id"], u["present_side"], u["host"]) for u in un] == [
-        ("CONN-002", "source", "SRV-FILE-02")
-    ]
+    assert {u["conn_id"] for u in un} == {conn_b, *collateral(world)}
+    assert next(u for u in un if u["conn_id"] == conn_b)["present_side"] == "source"
+
+
+def test_collateral_connections_lost_exactly_their_dc_end(world):
+    clean, pert = _by_conn(world, Variant.clean), _by_conn(world, Variant.perturbed)
+    assert collateral(world)  # the window sits in a busy part of the DC log
+    for cid in collateral(world):
+        assert len(clean[cid]) == 2 and len(pert[cid]) == 1
+        assert pert[cid][0]["host"] != "DC-01"
+        assert {ln["host"] for ln in clean[cid]} >= {"DC-01"}
 
 
 @pytest.mark.parametrize("variant", list(Variant))
@@ -163,7 +183,8 @@ def test_p2_shifts_every_srv_line_including_link_lines(world):
     assert {
         (parse_ts(b["ts"]) - parse_ts(a["ts"])).total_seconds() for a, b in zip(c, p, strict=True)
     } == {420}
-    assert sum("conn_id" in x for x in p) == 2  # LINK-A destination and LINK-B source
+    conn_a, conn_b = link_ids(world)  # LINK-A destination and LINK-B source are on this host
+    assert {x["conn_id"] for x in p if "conn_id" in x} >= {conn_a, conn_b}
     p2 = next(k for k in world.keys[Variant.perturbed].contradictions if k.kind == "clock_skew")
     assert p2.params["lines_shifted"] == len(p)
 
@@ -243,7 +264,7 @@ def test_key_rejects_missing_conn_id_and_unresolvable_conn_id(world):
         _link(_mutated(world, no_conn).links[1].model_dump(mode="json"))
 
     def wrong_conn(key):
-        key.links[1].evidence_refs[0].conn_id = "CONN-099"
+        key.links[1].evidence_refs[0].conn_id = "CONN-9999"
 
     key = _mutated(world, wrong_conn)
     problems = check_link_refs(key, world.scn, world.inv, world.dirs[Variant.clean])
@@ -279,8 +300,8 @@ def test_duplicate_link_ids_are_rejected(world):
         AnswerKey.model_validate_json(key.model_dump_json())
 
 
-def test_links_present_in_both_committed_keys(v3):
+def test_links_present_in_both_committed_keys(v4):
     for variant in Variant:
-        assert [k.id for k in v3.keys[variant].links] == list(EXPECT)
-    note = v3.keys[Variant.clean].missing_evidence[3]
+        assert [k.id for k in v4.keys[variant].links] == list(EXPECT)
+    note = v4.keys[Variant.clean].missing_evidence[3]
     assert "still absent" in note.description and "stand in" in note.description

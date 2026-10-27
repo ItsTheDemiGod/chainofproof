@@ -11,88 +11,133 @@ Nothing is changed in the generator by this module.
 
 `si_*` vs `fn_*` differences are not listed as a feature: they ARE the planted timestomp perturbation, not a style tell.
 
-## credtheft_lateral_v3_clean
+## credtheft_lateral_v4_clean
 
-* auth_log: 9 referenced lines, 800 benign lines
-* fs_timeline: 5 referenced lines, 1187 benign lines
+* auth_log: 9 referenced lines, 980 benign lines
+* fs_timeline: 5 referenced lines, 1147 benign lines
 
 | source | feature | verdict | coverage | referenced-only (ref/ben) |
 |---|---|---|---|---|
-| auth_log | event | separates cleanly | 0.78 | NAMED_PIPE_OPEN (3/0); CONN_OUT (2/0); CONN_ACCEPTED (1/0); DIRECTORY_REPLICATION_REQUEST (1/0) |
-| auth_log | user | separates cleanly | 1.00 | None (6/0); user01 (2/0); Administrator (1/0) |
-| auth_log | logon_type | weak | 0.11 | 9 (1/0) |
-| auth_log | service | weak | 0.33 | drsuapi (2/0); smb (1/0) |
+| auth_log | event | none | 0.00 | - |
+| auth_log | user | none | 0.00 | - |
+| auth_log | logon_type | none | 0.00 | - |
+| auth_log | service | none | 0.00 | - |
 | auth_log | dst_host | none | 0.00 | - |
-| auth_log | src_ip | separates cleanly | 1.00 | 10.20.2.2 (5/0); 10.20.1.7 (3/0); None (1/0) |
-| auth_log | key_presence | separates cleanly | 0.89 | conn_id,dst_host,service,src_ip (3/0); dst_host,pipe_name,src_ip (3/0); conn_id,dst_host,logon_type,src_ip,user (1/0); dst_host,logon_id,user (1/0) |
+| auth_log | src_ip | none | 0.00 | - |
+| auth_log | key_presence | none | 0.00 | - |
 | auth_log | second_of_minute | none | 0.00 | - |
 | auth_log | minute_of_hour | none | 0.00 | - |
 | auth_log | zero_microseconds | none | 0.00 | - |
 | auth_log | position_decile | none | 0.00 | - |
-| fs_timeline | extension | separates cleanly | 0.80 | .exe (3/0); .pf (1/0) |
-| fs_timeline | dir_prefix | separates cleanly | 0.80 | c:\users\ieuser (2/0); c:\windows\prefetch (1/0); c:\windows\svchost.exe (1/0) |
-| fs_timeline | depth | separates cleanly | 0.60 | 6 (2/0); 2 (1/0) |
+| fs_timeline | extension | none | 0.00 | - |
+| fs_timeline | dir_prefix | weak | 0.20 | c:\windows\svchost.exe (1/0) |
+| fs_timeline | depth | none | 0.00 | - |
 | fs_timeline | size_bucket | none | 0.00 | - |
-| fs_timeline | name_stem | separates cleanly | 1.00 | mimikatz (1/0); powershell.exe-bfc (1/0); psexec (1/0); sekurlsa_out (1/0); svchost (1/0) |
+| fs_timeline | name_stem | separates cleanly | 0.60 | mimikatz (1/0); powershell.exe-bfc (1/0); psexec (1/0) |
 | fs_timeline | second_of_minute | none | 0.00 | - |
 | fs_timeline | minute_of_hour | none | 0.00 | - |
 | fs_timeline | zero_microseconds | none | 0.00 | - |
 | fs_timeline | position_decile | none | 0.00 | - |
 
-Position deciles (auth_log), referenced: [0, 0, 0, 0, 5, 4, 0, 0, 0, 0]; benign: [79, 81, 81, 82, 76, 77, 82, 81, 81, 80]
+Position deciles (auth_log), referenced: [0, 0, 4, 2, 1, 0, 0, 2, 0, 0]; benign: [98, 99, 95, 98, 97, 99, 100, 97, 99, 98]
 
-Position deciles (fs_timeline), referenced: [0, 0, 0, 2, 0, 0, 2, 0, 1, 0]; benign: [118, 119, 120, 117, 120, 119, 118, 119, 119, 118]
+Position deciles (fs_timeline), referenced: [0, 0, 0, 2, 0, 0, 2, 0, 1, 0]; benign: [114, 115, 116, 113, 116, 115, 114, 115, 115, 114]
 
-## credtheft_lateral_v3_perturbed
+## credtheft_lateral_v4_perturbed
 
-* auth_log: 7 referenced lines, 789 benign lines
-* fs_timeline: 5 referenced lines, 1187 benign lines
+* auth_log: 7 referenced lines, 959 benign lines
+* fs_timeline: 5 referenced lines, 1147 benign lines
 
 | source | feature | verdict | coverage | referenced-only (ref/ben) |
 |---|---|---|---|---|
-| auth_log | event | separates cleanly | 0.71 | NAMED_PIPE_OPEN (3/0); CONN_OUT (2/0) |
-| auth_log | user | separates cleanly | 1.00 | None (5/0); user01 (2/0) |
-| auth_log | logon_type | weak | 0.14 | 9 (1/0) |
-| auth_log | service | weak | 0.29 | drsuapi (1/0); smb (1/0) |
+| auth_log | event | none | 0.00 | - |
+| auth_log | user | none | 0.00 | - |
+| auth_log | logon_type | none | 0.00 | - |
+| auth_log | service | none | 0.00 | - |
 | auth_log | dst_host | none | 0.00 | - |
-| auth_log | src_ip | separates cleanly | 1.00 | 10.20.2.2 (4/0); 10.20.1.7 (3/0) |
-| auth_log | key_presence | separates cleanly | 0.86 | dst_host,pipe_name,src_ip (3/0); conn_id,dst_host,service,src_ip (2/0); conn_id,dst_host,logon_type,src_ip,user (1/0) |
+| auth_log | src_ip | none | 0.00 | - |
+| auth_log | key_presence | none | 0.00 | - |
 | auth_log | second_of_minute | none | 0.00 | - |
 | auth_log | minute_of_hour | none | 0.00 | - |
 | auth_log | zero_microseconds | none | 0.00 | - |
 | auth_log | position_decile | none | 0.00 | - |
-| fs_timeline | extension | separates cleanly | 0.80 | .exe (3/0); .pf (1/0) |
-| fs_timeline | dir_prefix | separates cleanly | 0.80 | c:\users\ieuser (2/0); c:\windows\prefetch (1/0); c:\windows\svchost.exe (1/0) |
-| fs_timeline | depth | separates cleanly | 0.60 | 6 (2/0); 2 (1/0) |
+| fs_timeline | extension | none | 0.00 | - |
+| fs_timeline | dir_prefix | weak | 0.20 | c:\windows\svchost.exe (1/0) |
+| fs_timeline | depth | none | 0.00 | - |
 | fs_timeline | size_bucket | none | 0.00 | - |
-| fs_timeline | name_stem | separates cleanly | 1.00 | mimikatz (1/0); powershell.exe-bfc (1/0); psexec (1/0); sekurlsa_out (1/0); svchost (1/0) |
+| fs_timeline | name_stem | separates cleanly | 0.60 | mimikatz (1/0); powershell.exe-bfc (1/0); psexec (1/0) |
 | fs_timeline | second_of_minute | none | 0.00 | - |
 | fs_timeline | minute_of_hour | none | 0.00 | - |
 | fs_timeline | zero_microseconds | none | 0.00 | - |
 | fs_timeline | position_decile | none | 0.00 | - |
 
-Position deciles (auth_log), referenced: [0, 0, 0, 0, 5, 2, 0, 0, 0, 0]; benign: [79, 81, 81, 82, 76, 66, 82, 81, 81, 80]
+Position deciles (auth_log), referenced: [0, 0, 4, 2, 1, 0, 0, 0, 0, 0]; benign: [98, 99, 95, 98, 97, 99, 93, 83, 99, 98]
 
-Position deciles (fs_timeline), referenced: [0, 0, 0, 2, 0, 0, 2, 0, 1, 0]; benign: [118, 119, 120, 117, 120, 119, 118, 119, 119, 118]
+Position deciles (fs_timeline), referenced: [0, 0, 0, 2, 0, 0, 2, 0, 1, 0]; benign: [114, 115, 116, 113, 116, 115, 114, 115, 115, 114]
 
 ## Features that separate cleanly (in at least one case)
 
-* depth
-* dir_prefix
-* event
-* extension
-* key_presence
 * name_stem
-* src_ip
-* user
 
 ## Recommended generator changes (NOT applied; ordered by number of cases)
 
-1. `event`: Draw benign event names from the same pool the key lines use (e.g. add benign CONN_OUT/CONN_ACCEPTED and NAMED_PIPE_OPEN lines).
-2. `user`: Use the same account vocabulary for benign and key lines (the key lines use `user01`, `unknown` or machine names that no benign line uses).
-3. `src_ip`: Draw benign source addresses from the virtual hosts' own addresses as well.
-4. `key_presence`: Make the set of keys per line identical across benign and key lines.
-5. `extension`: Give benign files the same extensions as the key files (.exe, .pf, .txt).
-6. `dir_prefix`: Place benign files in the same directories as the key files.
-7. `depth`: Match path depth distributions.
-8. `name_stem`: Generate benign file names from a vocabulary that includes tool-like names (and avoid names that appear only in key rows).
+1. `name_stem`: Generate benign file names from a vocabulary that includes tool-like names (and avoid names that appear only in key rows).
+
+---
+
+## Phase 4.1: before and after (hand-written; everything above this line is regenerated by `style-audit`)
+
+Same rule, same code (`eval/style_audit.py` was not changed), run on the v3 cases (Phase 4) and on
+the v4 cases (Phase 4.1). Coverage = share of referenced lines whose value occurs in no benign line.
+
+| source | feature | v3 clean | v4 clean | v3 perturbed | v4 perturbed |
+|---|---|---|---|---|---|
+| auth_log | event | **0.78 clean** | 0.00 | **0.71 clean** | 0.00 |
+| auth_log | user | **1.00 clean** | 0.00 | **1.00 clean** | 0.00 |
+| auth_log | logon_type | 0.11 weak | 0.00 | 0.14 weak | 0.00 |
+| auth_log | service | 0.33 weak | 0.00 | 0.29 weak | 0.00 |
+| auth_log | dst_host | 0.00 | 0.00 | 0.00 | 0.00 |
+| auth_log | src_ip | **1.00 clean** | 0.00 | **1.00 clean** | 0.00 |
+| auth_log | key_presence | **0.89 clean** | 0.00 | **0.86 clean** | 0.00 |
+| auth_log | second_of_minute, minute_of_hour, zero_microseconds, position_decile | 0.00 | 0.00 | 0.00 | 0.00 |
+| fs_timeline | extension | **0.80 clean** | 0.00 | **0.80 clean** | 0.00 |
+| fs_timeline | dir_prefix | **0.80 clean** | 0.20 weak | **0.80 clean** | 0.20 weak |
+| fs_timeline | depth | **0.60 clean** | 0.00 | **0.60 clean** | 0.00 |
+| fs_timeline | size_bucket | 0.00 | 0.00 | 0.00 | 0.00 |
+| fs_timeline | name_stem | **1.00 clean** | **0.60 clean** | **1.00 clean** | **0.60 clean** |
+| fs_timeline | second_of_minute, minute_of_hour, zero_microseconds, position_decile | 0.00 | 0.00 | 0.00 | 0.00 |
+
+Features that separated cleanly: v3 clean/perturbed 8 (`event`, `user`, `src_ip`, `key_presence`,
+`extension`, `dir_prefix`, `depth`, `name_stem`); v4 clean/perturbed 1 (`name_stem`), which is one of
+the documented unavoidable ones (below). Referenced lines: 9 clean / 7 perturbed auth lines and 5
+timeline rows; benign lines: 980 / 959 auth lines and 1147 timeline rows.
+Position deciles of the referenced auth lines moved from `[0,0,0,0,5,4,0,0,0,0]` (v3) to
+`[0,0,4,2,1,0,0,2,0,0]` (v4), spread over deciles 2, 3, 4 and 7 (3 hosts, three different spans).
+
+**Pass criterion.** No feature separates cleanly except the documented unavoidable ones: (i)
+`name_stem` for rows paired with real image basenames; (ii) `pipe_name` for lines paired with real
+pipe names; (iii) the `conn_id` / `logon_id` values themselves. The audit's feature list has no
+`pipe_name` or `conn_id` feature, so (ii) and (iii) do not appear in the tables. **Result: met after
+one generator iteration** (the first v4 build already satisfied it; no further iteration needed).
+
+**Remaining tells, honestly.**
+* `name_stem` (0.60 clean): `mimikatz` (the real image), `psexec` (the real image), and the
+  PowerShell prefetch entry whose name carries a hash suffix (`powershell.exe-<hash>.pf`). All three
+  are paired with real image basenames (exception i). A benign `PsExec64.exe` would make `psexec`
+  non-exclusive; it was deliberately NOT added (a legitimate PsExec on the workstation would blur the
+  storyline, and the exception is documented).
+* `dir_prefix` (0.20, weak): `c:\windows\svchost.exe`. The audit's directory prefix is the first
+  three path components, which for a depth-2 path includes the file name, so any file directly in
+  `C:\Windows` is unique by construction. The path itself is the real image path of the S4 event, so
+  it is kept (a synthetic row must not assert a different location than the real event shows).
+* Pipe names: the three key pipe lines are `svchost-MSEDGEWIN10-8116-{stdin,stdout,stderr}`; they
+  contain a real computer name because the pairing needs the real name. Benign pipe names are
+  ordinary names or names with hexadecimal/process ids, but none has this "service-computer-pid-
+  stream" shape. An agent that notices this is reading the content, which is real.
+* Order of fields within a line and the `pair=`/`synth_only=` markers differ between key and benign
+  lines in the raw files; the markers are stripped from the agent view (leakage test) and field order
+  is not exposed there.
+* The log gap itself (seq jump) is planted by design and is not a style tell.
+* The audit looks at values and shapes, not at joint behaviour: for example every benign connection
+  pair has delta 0 s between its ends, exactly like the key links (kept so the oracle `delta 0 s`
+  holds), and benign pairs only occur between the three logged hosts.

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import random
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 
 from chainofproof.scenarios.companions import Pairing
@@ -27,6 +27,8 @@ class GenContext:
 
     scenario: Scenario
     inventory: Inventory
+    # virtual host -> lower-case pipe names present in its REAL events (benign pipes avoid them)
+    real_pipes: dict[str, frozenset[str]] = field(default_factory=dict)
 
     @property
     def start(self) -> datetime:

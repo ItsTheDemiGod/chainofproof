@@ -8,7 +8,11 @@ Matching rules (written before the first run):
 * log gap (sequence_gap): found when a hit names the key's label and host and its missing seq range
   equals the key's range EXACTLY.
 * audit_log_cleared hits match the key's T1070.001 action (an "action indicator", not a
-  contradiction). missing_counterpart hits match the key's unmatched connection ids.
+  contradiction). missing_counterpart hits match the key's unmatched connection ids (the GT-LNK-004
+  connection).
+* missing_counterpart hits on conn_ids in the log gap's expected_collateral_conn_ids are EXPLAINED
+  COLLATERAL: benign connections whose DC-01 end the gap removed. They are reported separately,
+  are neither unexpected hits nor contradictions, and are left out of the precision denominator.
 * Every other hit is UNEXPECTED.
 """
 
@@ -53,16 +57,25 @@ class CaseEval:
     cons: list[ConResult] = field(default_factory=list)
     indicators: list[tuple[str, str]] = field(default_factory=list)  # (GT-ACT id, hit id)
     matched: set[int] = field(default_factory=set)  # indexes into hits
+    explained: set[int] = field(default_factory=set)  # hits on expected collateral conn_ids
+    collateral_ids: list[str] = field(default_factory=list)  # the key's expected collateral
     unexpected: list[Hit] = field(default_factory=list)
     link_flags: list[tuple[str, str, bool]] = field(default_factory=list)  # (GT-LNK, conn, flagged)
 
     def precision(self) -> dict[str, tuple[int, int]]:
-        """Per detector: (matched hits, total hits)."""
+        """Per detector: (matched hits, total hits); explained collateral is not counted."""
         out: dict[str, list[int]] = defaultdict(lambda: [0, 0])
         for i, h in enumerate(self.hits):
+            if i in self.explained:
+                continue
             out[h.detector][1] += 1
             out[h.detector][0] += i in self.matched
         return {k: (v[0], v[1]) for k, v in sorted(out.items())}
+
+    def collateral_missed(self) -> list[str]:
+        """Expected collateral conn_ids that no unmatched_connection hit flagged."""
+        seen = {self.hits[i].measures.get("conn_id") for i in self.explained}
+        return [c for c in self.collateral_ids if c not in seen]
 
     def summary_text(self) -> str:
         """Plain-text report (ids, kinds, numbers only)."""
@@ -74,6 +87,10 @@ class CaseEval:
                          f"{c.hit_ids} measured {c.measured} (key {c.key_value})")  # fmt: skip
         lines += [f"  action indicator {a} <- {h}" for a, h in self.indicators]
         lines += [f"  precision {d}: {m}/{t}" for d, (m, t) in self.precision().items()]
+        if self.collateral_ids:
+            lines.append(f"  explained collateral: {len(self.explained)} of "
+                         f"{len(self.collateral_ids)} expected conn_ids flagged "
+                         f"(missed: {self.collateral_missed() or 'none'})")  # fmt: skip
         for lid, cid, flagged in self.link_flags:
             lines.append(f"  {lid} {cid}: unmatched_connection flagged={flagged}")
         for h in self.unexpected:
@@ -105,6 +122,9 @@ def match_hits(
     conns = {
         u["conn_id"] for c in key.contradictions for u in c.params.get("unmatched_connections", [])
     }
+    ev.collateral_ids = sorted(
+        {i for c in key.contradictions for i in c.expected_collateral_conn_ids}
+    )
     clear_uids = {
         u
         for a in key.actions
@@ -115,11 +135,15 @@ def match_hits(
     for i, h in enumerate(hits):
         if h.detector == "unmatched_connection" and h.measures.get("conn_id") in conns:
             ev.matched.add(i)
+        elif (
+            h.detector == "unmatched_connection" and h.measures.get("conn_id") in ev.collateral_ids
+        ):
+            ev.explained.add(i)
         elif h.kind == "audit_log_cleared" and clear_uids & set(h.event_uids):
             ev.matched.add(i)
             act = next(a.id for a in key.actions if a.attack_technique_id == "T1070.001")
             ev.indicators.append((act, h.hit_id or h.hit_key[:8]))
-    ev.unexpected = [h for i, h in enumerate(hits) if i not in ev.matched]
+    ev.unexpected = [h for i, h in enumerate(hits) if i not in ev.matched and i not in ev.explained]
     seen = {h.measures.get("conn_id") for h in hits if h.detector == "unmatched_connection"}
     for ln in key.links:
         for cid in sorted({r.conn_id for r in ln.evidence_refs if r.conn_id}):

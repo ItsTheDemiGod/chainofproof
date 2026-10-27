@@ -1,4 +1,4 @@
-"""Detector evaluation: matching rules and the end-to-end fixture (synthetic v3 sources)."""
+"""Detector evaluation: matching rules and the end-to-end fixture (synthetic v4 sources)."""
 
 import pytest
 
@@ -11,7 +11,7 @@ from chainofproof.tools.detectors.runner import get_params
 from chainofproof.tools.loader import load_case_events
 from evfactory import ev
 
-CLEAN, PERT = "credtheft_lateral_v3_clean", "credtheft_lateral_v3_perturbed"
+CLEAN, PERT = "credtheft_lateral_v4_clean", "credtheft_lateral_v4_perturbed"
 
 
 def fake_hit(detector, kind, uids=("EVT-000000000001",), **measures):
@@ -19,8 +19,8 @@ def fake_hit(detector, kind, uids=("EVT-000000000001",), **measures):
 
 
 @pytest.fixture
-def key(v3):
-    return v3.keys[Variant.perturbed]
+def key(v4):
+    return v4.keys[Variant.perturbed]
 
 
 def run_match(key, hits, resolve=None, label_of=None):
@@ -87,14 +87,37 @@ def test_other_hits_are_unexpected_and_precision_counts(key):
     assert dict((lid, flagged) for lid, cid, flagged in r.link_flags)["GT-LNK-004"] is True
 
 
-# ---- end to end on the synthetic v3 sources ---------------------------------------------------
-def with_real_side(paths, case, clean_events):
+def test_collateral_hits_are_explained_not_unexpected_and_left_out_of_precision(key):
+    gap = key.contradictions[2]
+    col = gap.expected_collateral_conn_ids
+    link_b = gap.params["unmatched_connections"][0]["conn_id"]
+    assert len(col) >= 1
+    hits = [fake_hit("unmatched_connection", "missing_counterpart", conn_id=c) for c in col]
+    hits += [
+        fake_hit("unmatched_connection", "missing_counterpart", conn_id=link_b),
+        fake_hit("unmatched_connection", "missing_counterpart", conn_id="CONN-9999"),
+    ]
+    r = run_match(key, hits)
+    assert len(r.explained) == len(col) and r.collateral_missed() == []
+    assert [h.measures["conn_id"] for h in r.unexpected] == ["CONN-9999"]
+    assert r.precision()["unmatched_connection"] == (
+        1,
+        2,
+    )  # link B matched; bogus id; no collateral
+    assert "explained collateral" in r.summary_text()
+    short = run_match(key, hits[1:])  # one collateral id not flagged by any detector
+    assert short.collateral_missed() == col[:1]
+
+
+# ---- end to end on the synthetic v4 sources ---------------------------------------------------
+def with_real_side(paths, case, clean_events, real_names):
     """Synthetic events of ``case`` plus fabricated EVTX pipe events copied from the CLEAN data.
 
-    The fabricated events stand in for the real S4 pipe events (same pipe names, clean times).
+    The fabricated events stand in for the real S4 pipe events (the key's paired pipe names, clean
+    times); benign pipe lines have no real counterpart and get none.
     """
     events, _ = load_case_events(paths, case)
-    pipes = [e for e in clean_events if e.pipe_name and e.source_kind == "auth_log"]
+    pipes = [e for e in clean_events if e.source_kind == "auth_log" and e.pipe_name in real_names]
     fake = [
         ev("EVTX-ffffff", e.timestamp, e.host, "pipe_connected", pipe_name="\\" + e.pipe_name,
             record_id=i, event_id=18)
@@ -107,18 +130,25 @@ def detect_all(events):
     return [h for n, (fn, _) in DETECTORS.items() for h in fn(events, get_params(n))]
 
 
-def test_end_to_end_perturbed_finds_exactly_the_planted_three_and_clean_none(synth_norm, v3):
+def test_end_to_end_perturbed_finds_exactly_the_planted_three_and_clean_none(synth_norm, v4):
     paths, _ = synth_norm
     clean_events, _ = load_case_events(paths, CLEAN)
+    skew = next(
+        c for c in v4.keys[Variant.perturbed].contradictions if c.kind.value == "clock_skew"
+    )
+    names = {p["pairing_value"] for p in skew.params["paired_lines"]}
     results = {}
     for variant, case in ((Variant.clean, CLEAN), (Variant.perturbed, PERT)):
-        hits = detect_all(with_real_side(paths, case, clean_events))
+        hits = detect_all(with_real_side(paths, case, clean_events, names))
         resolve, label_of = index_resolvers(build_index(paths, case))
-        results[variant] = match_hits(v3.keys[variant], hits, resolve, label_of, variant, case)
+        results[variant] = match_hits(v4.keys[variant], hits, resolve, label_of, variant, case)
     clean, pert = results[Variant.clean], results[Variant.perturbed]
     assert clean.hits == [] and clean.unexpected == []  # no log_clear in the synthetic fixture
     assert [c.found for c in pert.cons] == [True, True, True]
     assert pert.unexpected == []
+    gap = next(c for c in v4.keys[Variant.perturbed].contradictions if c.kind.value == "log_gap")
+    assert len(pert.explained) == len(gap.expected_collateral_conn_ids) > 0
+    assert pert.collateral_missed() == []
     assert isinstance(pert.hits[0], Hit)
     assert dict((lid, f) for lid, _, f in pert.link_flags) == {
         "GT-LNK-002": False,

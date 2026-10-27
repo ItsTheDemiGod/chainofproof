@@ -143,9 +143,9 @@ def test_billion_laughs_rejected_by_defusedxml():
         parse_event_xml(bomb)
 
 
-def test_same_computer_name_two_sources_two_virtual_hosts(v3):
-    s3 = build_context(v3.scn, v3.scn.source("s3_psexec_smb"), "EV-1", "a" * 64)
-    d1 = build_context(v3.scn, v3.scn.source("d1_winlogon_persist"), "EV-2", "b" * 64)
+def test_same_computer_name_two_sources_two_virtual_hosts(v4):
+    s3 = build_context(v4.scn, v4.scn.source("s3_psexec_smb"), "EV-1", "a" * 64)
+    d1 = build_context(v4.scn, v4.scn.source("d1_winlogon_persist"), "EV-2", "b" * 64)
     raw = parse_event_xml(xml(SYSMON, 1, 7, d(Image=r"C:\a.exe"), computer="IEWIN7"))
     (e3, _), (e1, _) = build_event(raw, s3), build_event(raw, d1)
     assert (e3.host, e1.host) == ("SRV-FILE-02", "WS-HR-03")
@@ -259,7 +259,7 @@ def test_auth_parser_event_types_and_markers(tmp_path):
         f"seq=000001 ts={T} host=WS-FIN-07 event=LOGON_SUCCESS user=a.b src_ip=10.0.0.1 "
         "dst_host=WS-FIN-07 logon_type=3 logon_id=0xABC pair=logon_id:0xabc\n"
         f"seq=000002 ts={T} host=DC-01 event=CONN_OUT user=unknown src_ip=unknown dst_host=DC-01 "
-        "conn_id=CONN-001 service=smb synth_only=1\n"
+        "conn_id=CONN-0001 service=smb synth_only=1\n"
         f"seq=000003 ts={T} host=DC-01 event=KERBEROS_TGS_REQUEST user=a.b src_ip=10.0.0.9 "
         "dst_host=DC-01 service=cifs/DC-01\n",
         encoding="utf-8",
@@ -267,7 +267,7 @@ def test_auth_parser_event_types_and_markers(tmp_path):
     out = list(iter_auth_log(f, vctx(SourceKindName.auth_log)))
     a, b, c = out
     assert a[0].event_type == EventType.auth_logon and a[0].logon_id == "0xabc"
-    assert b[0].event_type == EventType.auth_conn and b[0].conn_id == "CONN-001"
+    assert b[0].event_type == EventType.auth_conn and b[0].conn_id == "CONN-0001"
     assert b[0].user is None and b[0].src_ip is None
     assert c[0].event_type == EventType.other and c[0].fields["service"] == "cifs/DC-01"
     assert a[0].record_id == 1
