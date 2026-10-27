@@ -35,6 +35,27 @@ detectors:
     window_seconds: 60             # "immediately after": one minute of follow-on activity
   unmatched_connection: {}
 
+# Agent runtime (Phase 5). Fixed before the first real run; rationale per value in docs/agents.md.
+agent:
+  default_model: qwen2.5:7b-instruct
+  planner_max_rounds: 10
+  worker_max_steps: 8
+  max_llm_calls_per_run: 120
+  max_run_seconds: 1800
+  json_retries: 2
+  consecutive_failure_limit: 3
+  finding_revisions: 2
+  num_predict: 700
+  keep_alive: "10m"
+  max_prompt_fraction: 0.8      # of (num_ctx - num_predict)
+  max_tool_output_chars: 3500
+  known_events_cap: 60
+  handoff_max_chars: 300
+  rationale_max_chars: 240
+  claim_max_chars: 400
+  ledger_llm_calls: true
+  request_timeout_seconds: 300
+
 optional_cloud:
   enabled: false
   provider: none

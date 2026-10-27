@@ -39,7 +39,7 @@ Agents may all use the same local model with different prompts and different too
 - Phase 3: Forensic tool layer and normalized event format [DONE]
 - Phase 4: Evidence graph and contradiction detectors [DONE]
 - Phase 4.1: Generator realism rebuild, scenario v4 [DONE]
-- Phase 5: Agent core (LLM client, planner loop, citation verifier) [TODO]
+- Phase 5: Agent core [DONE] (LLM client, planner loop, workers, findings, citation verifier, replay)
 - Phase 6: Skeptic, calibration, missing-evidence reasoning [TODO]
 - Phase 7: Prompt-injection defense [TODO]
 - Phase 8: Reporter, MITRE mapping, Streamlit UI [TODO]
@@ -57,10 +57,20 @@ Agents may all use the same local model with different prompts and different too
 - D3: detector thresholds come from first principles, live in `config/settings.yaml` (section `detectors`) and `docs/decisions.md`, and are never tuned afterwards to improve scores.
 - D6: detector hits are citable evidence: citation ids are `EVT-<12hex>` (events) or `HIT-######` (detector hits). `FND-####` stays reserved for Phase 5 agent findings.
 
+## Agent rules (Phase 5, enforced by tests)
+- A1: agents call tools ONLY through `chainofproof.tools.registry.call_tool(role, ...)`. The `agents` and `llm` packages never import `chainofproof.eval`, scenario/answer-key modules, or mention `event_eval_meta`.
+- A2: prompts are GENERIC (analyst job and rules, never this scenario). No scenario terms in any template or in the non-data part of a rendered prompt. `prompt_version` = sha256 of all templates + output schemas, recorded in every run. Prompts/parameters are fixed before the first real run; every later change needs an entry in `docs/prompt_changelog.md`.
+- A3: an agent run sees ONLY detector hits created by that same agent run (origin `agent`). Harness hits are invisible to agents and cannot be cited by them.
+- A4: evidence-derived text and evidence-influenced model output appear in prompts ONLY inside delimited untrusted-data blocks (`<<<DATA id=... source=...>>>`), after sanitizing and escaping.
+- A5: every LLM call and every tool call of an agent run is recorded in the ledger (hashes, never contents).
+- A6: the citation verifier is deterministic plain code; no LLM in the verifier.
+- A7: agent DB access goes through a restricted connection whose SQLite authorizer denies `event_eval_meta` and any eval table.
+
 ## Synthetic realism (Phase 4.1)
 - Synthetic benign data must share the vocabulary of attacker-related synthetic lines; key-referenced lines must not be separable by superficial features; residual unavoidable tells are documented in docs/style_audit.md.
 
 ## Conventions
+- IDs in Phase 5: agent run ids reuse `RUN-######` (folder `data/runs/RUN-######/` with `trace.jsonl`, `llm/`, `notebook.json`), findings `FND-####`, detector hits `HIT-######`, events `EVT-<12hex>`. Prompts show findings as run-local `F<n>` so replays hash identically.
 - IDs added in Phase 4: detector hits `HIT-######`.
 - IDs added in Phase 3: event ids `EVT-<12hex>` (sha256 of evidence sha256 + ":" + record locator), run ids `RUN-000001`, detection ids `DET-000001`; evidence labels `<KIND>-<6hex>` (EVTX/FSTL/AUTH).
 - Python 3.11+, src layout, package name chainofproof, type hints everywhere, pydantic v2 for schemas, pathlib for paths.

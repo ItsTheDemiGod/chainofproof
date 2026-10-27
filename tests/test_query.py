@@ -104,7 +104,7 @@ FORBIDDEN = re.compile(
 
 
 def agent_side_files():
-    tools = ("query", "graph_query", "registry", "loader")
+    tools = ("query", "graph_query", "registry", "registry_args", "loader", "scope")
     files = [SRC / "tools" / f"{n}.py" for n in tools]
     for pkg in ("agents", "report", "ui", "llm", "security", "graph", "tools/detectors"):
         files += sorted((SRC / pkg).rglob("*.py")) if (SRC / pkg).is_dir() else []

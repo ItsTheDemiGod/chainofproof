@@ -6,7 +6,7 @@ where every claim cites evidence IDs. Fully local (Ollama), free, reproducible.
 See `CLAUDE.md` for principles, architecture and phases.
 
 ## Status
-Phases 0 to 4 done (ingestion and custody, datasets and answer keys, cross-host links, forensic tool layer, evidence graph and five contradiction detectors with a tool registry). Next: Phase 5 (agent core). See `docs/tools.md`, `docs/graph.md`, `docs/detectors.md`.
+Phases 0 to 5 done (ingestion and custody, datasets and answer keys, cross-host links, forensic tool layer, evidence graph and five contradiction detectors with a tool registry, agent core: LLM client, planner and workers, findings, deterministic citation verifier, replay). Next: Phase 6 (skeptic, calibration, missing-evidence reasoning). See `docs/agents.md`, `docs/verifier.md`, `docs/tools.md`, `docs/graph.md`, `docs/detectors.md`.
 
 ## Setup (Windows, PowerShell)
 ```powershell
@@ -44,7 +44,7 @@ Set `CHAINOFPROOF_BASE_DIR` to use a throwaway data root instead of `data/`.
 | `scenario-key-show SCENARIO_ID clean\|perturbed` | answer key as tables |
 | `tools-check` | Hayabusa present? version, exe hash, rules-tree hash, can it run help |
 | `hayabusa-run EV-000001` | run Hayabusa on the working copy of one EVTX item (output in `data/runs/RUN-######/`) |
-| `db-migrate` | migrate the database to schema v2 (online backup first; no-op when already v2) |
+| `db-migrate` | migrate the database to the latest schema (v4; online backup first; no-op when current) |
 | `normalize CASE_ID [--evidence EV-ID]` | migrate if needed, normalize all evidence (agent view + eval layer) and run Hayabusa on every EVTX |
 | `events-stats CASE_ID` | per-source counts and event types (agent view only) |
 | `events-show CASE_ID [--host H] [--type T] [--limit N]` | normalized events (agent view only, max 50) |
@@ -54,6 +54,12 @@ Set `CHAINOFPROOF_BASE_DIR` to use a throwaway data root instead of `data/`.
 | `eval-detectors CASE_ID... [--baseline-md FILE]` | EVAL ONLY: score detectors against the answer keys (+ robustness seeds 101-105) |
 | `style-audit CASE_ID... [--out FILE]` | EVAL ONLY: can key-referenced lines be told apart from benign ones by style? (report only) |
 | `eval-coverage CASE_ID... [--baseline-md FILE]` | EVAL ONLY: answer-key coverage, count/alignment checks, Hayabusa-only baseline |
+| `llm-check [--model M]` | Ollama reachable, models present, a tiny structured call, latency, tokens/s, loaded context |
+| `agent-run CASE_ID [--model M] [--max-rounds N] [--seed S] [--llm ollama\|fake:PATH]` | run the agent (migrates to schema v4 first); `fake:` only for tests and demos |
+| `agent-runs [--case CASE_ID]` / `findings-show RUN_ID [--status S]` | list runs / findings of a run (claim text is model output, capped at 120 characters) |
+| `agent-trace RUN_ID [--limit N]` | structured summary of a run's trace (no model text) |
+| `agent-replay RUN_ID` | offline replay against the recorded LLM replies; verifies findings, statuses and tool-call sequence |
+| `agent-peek RUN_ID` | EVAL ONLY, PRELIMINARY: do the run's findings touch the key's planted truth? (mechanics check, not the Phase 9 evaluation) |
 
 Datasets live in `data/downloads/` (gitignored); see `docs/scenarios.md`. The current scenario is
 `credtheft_lateral_v4`: real EVTX captures plus labeled SYNTHETIC companions, including two

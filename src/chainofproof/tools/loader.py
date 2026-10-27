@@ -21,6 +21,15 @@ def sort_key(e: NormalizedEvent) -> tuple[str, str, int, str]:
     return (e.timestamp, e.evidence_label, e.record_id or 0, e.event_uid)
 
 
+def case_input_sha(paths: Paths, case_id: str) -> str:
+    """sha256 over the sorted JSONL hashes of the latest normalization runs of the case."""
+    with closing(connect(paths.db_path)) as conn:
+        hashes = [r[0] for r in conn.execute(
+            f"SELECT jsonl_sha256 FROM norm_runs WHERE run_id IN ({LATEST_RUNS})", [case_id]
+        )]  # fmt: skip
+    return sha256_json(sorted(hashes))
+
+
 def load_case_events(paths: Paths, case_id: str) -> tuple[list[NormalizedEvent], str]:
     """(events sorted deterministically, input_sha256).
 

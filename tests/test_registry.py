@@ -1,5 +1,6 @@
 """Tool registry: roles, argument validation, schemas, outputs, stored detector runs."""
 
+import functools
 import json
 
 import pytest
@@ -12,9 +13,11 @@ from chainofproof.tools.registry import (
     TOOLS,
     ToolError,
     allowed_tools,
-    call_tool,
     export_schemas,
 )
+from chainofproof.tools.registry import call_tool as _call_tool
+
+call_tool = functools.partial(_call_tool, harness=True)  # these tests act as the harness
 
 PERT = "credtheft_lateral_v4_perturbed"
 QUERY = {"list_evidence_labels", "search_events", "get_event", "timeline_window", "source_summary"}

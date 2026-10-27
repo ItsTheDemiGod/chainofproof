@@ -79,3 +79,21 @@ Detector tools record a run (ledger entry, `detector_runs`, `detector_hits`) but
 Citation ids for later phases: `EVT-<12hex>` for events and `HIT-######` for detector hits.
 New CLI: `graph-build`, `graph-show`, `detect`, `detect-all` (humans and eval only), `hits-show`,
 `eval-detectors` and `style-audit` (EVAL ONLY).
+
+## Agent scoping (Phase 5, rules A1, A3, A7)
+
+`call_tool(role, name, args, paths, case_id, agent_run_id=None, *, harness=False)` now needs exactly one
+of `agent_run_id` (an agent) or `harness=True` (humans, the CLI, the eval harness, tests): a call with
+neither, or with both, is refused, so an agent role can never be mistaken for a harness call.
+
+* With an `agent_run_id` the call runs inside `tools/scope.py: agent_scope`: every database connection
+  opened in it has a SQLite authorizer that denies reading or writing `event_eval_meta` (rule A7), and
+  `get_hits` / the `detect_*` tools see and create only the hits of that agent run.
+* Detector runs and hits carry `origin` (`harness` for everything before Phase 5 and for human/eval
+  calls, `agent` for agent calls) and `agent_run_id`. Harness readers see only harness runs; an agent sees
+  only its own run's hits, so `get_hits` is empty at the start of a run (rule A3). A detector call is
+  idempotent per (agent run, detector, params sha): a repeat returns the stored hits.
+* The citation verifier resolves HIT ids only inside the citing agent run, so a harness hit id cited by
+  an agent is rejected.
+* Agents may import neither the registry's implementation modules nor query functions directly: a test
+  scans `agents/` and `llm/` for tool-function imports (`call_tool` appears only in `agents/context.py`).

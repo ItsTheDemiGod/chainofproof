@@ -8,6 +8,7 @@ Detectors are separate tools (``detect_<name>``): nothing here runs them automat
 from __future__ import annotations
 
 import json
+import sqlite3
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -36,6 +37,7 @@ from chainofproof.tools.registry_args import (
     TimelineArgs,
     det_args,
 )
+from chainofproof.tools.scope import agent_scope, current_agent_run
 
 ROLES = ("planner", "extractor", "correlator", "skeptic", "reporter")
 MAX_OUTPUT_CHARS = 200_000
@@ -73,7 +75,7 @@ class ToolSpec:
 
 def _run_det(name: str) -> Callable[[Paths, str, Any], BaseModel]:
     def call(paths: Paths, case_id: str, a: BaseModel) -> DetectorResult:
-        r = run_detector(paths, case_id, name, a.model_dump())
+        r = run_detector(paths, case_id, name, a.model_dump(), agent_run_id=current_agent_run())
         n = len(r.hits)
         return DetectorResult(
             run_id=r.run_id,
@@ -186,7 +188,9 @@ def _build() -> dict[str, ToolSpec]:
             GetHitsArgs,
             HitPage,
             R({"planner", "correlator", "skeptic", "reporter"}),
-            lambda p, c, a: stored_hits(p, c, a.detector, a.hit_id, a.limit),
+            lambda p, c, a: stored_hits(
+                p, c, a.detector, a.hit_id, a.limit, agent_run_id=current_agent_run()
+            ),
         ),
     ]
     descr = {
@@ -222,9 +226,25 @@ def export_schemas(role: str | None = None) -> list[dict[str, Any]]:
 
 
 def call_tool(
-    role: str, name: str, args: dict[str, Any] | None, paths: Paths, case_id: str
-) -> dict:
-    """Validate, authorize, run and bound one tool call; returns a JSON-serializable dict."""
+    role: str, name: str, args: dict[str, Any] | None, paths: Paths, case_id: str,
+    agent_run_id: str | None = None, *, harness: bool = False,
+) -> dict:  # fmt: skip
+    """Validate, authorize, run and bound one tool call; returns a JSON-serializable dict.
+
+    An agent call passes ``agent_run_id``: the DB connection is restricted (no eval tables) and
+    ``get_hits`` / detector tools see and create only that run's hits. Humans, the CLI and the eval
+    harness pass ``harness=True`` instead; a call with neither is refused (an agent role must
+    never be mistaken for a harness call, or the other way round).
+    """
+    if (agent_run_id is None) == (not harness):
+        raise ToolError("a tool call needs exactly one of agent_run_id (agent) or harness=True")
+    if agent_run_id is None:
+        return _call(role, name, args, paths, case_id)
+    with agent_scope(agent_run_id):
+        return _call(role, name, args, paths, case_id)
+
+
+def _call(role: str, name: str, args: dict[str, Any] | None, paths: Paths, case_id: str) -> dict:
     if role not in ROLES:
         raise ToolError(f"unknown role {role!r}")
     spec = TOOLS.get(name)
@@ -243,6 +263,10 @@ def call_tool(
         raise
     except UserError as e:
         raise ToolError(f"{name} failed: {e}") from None
+    except sqlite3.DatabaseError as e:
+        if "prohibited" in str(e) or "not authorized" in str(e):
+            raise ToolError(f"{name}: database access denied") from None
+        raise
     if len(json.dumps(result)) > MAX_OUTPUT_CHARS:
         raise ToolError(f"{name}: output too large; narrow the query")
     return result

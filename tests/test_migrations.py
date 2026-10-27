@@ -3,7 +3,12 @@ from contextlib import closing
 
 from chainofproof.custody.hashing import sha256_file
 from chainofproof.custody.ledger import Ledger
-from chainofproof.custody.migrations import migrate_to_v2, migrate_to_v3, schema_version
+from chainofproof.custody.migrations import (
+    migrate_to_v2,
+    migrate_to_v3,
+    migrate_to_v4,
+    schema_version,
+)
 from chainofproof.ingest.store import SCHEMA, EvidenceStore
 
 
@@ -96,10 +101,54 @@ def test_v1_passes_through_v2_to_v3(paths):
 def test_fresh_database_is_created_at_latest_version_and_not_migrated(paths):
     EvidenceStore(paths)
     with closing(sqlite3.connect(paths.db_path)) as con:
-        assert schema_version(con) == 3
-    assert V3_TABLES <= tables(paths)
+        assert schema_version(con) == 4
+    assert (V3_TABLES | V4_TABLES) <= tables(paths)
+    m = migrate_to_v4(paths)
     assert not migrate_to_v2(paths).migrated and not migrate_to_v3(paths).migrated
-    assert not (paths.db_dir / "backups").exists()
+    assert not m.migrated and not (paths.db_dir / "backups").exists()
+
+
+V4_TABLES = {"agent_runs", "agent_calls", "findings"}
+
+
+def test_v3_to_v4_keeps_data_marks_old_rows_as_harness_and_is_idempotent(paths):
+    make_v1(paths)
+    migrate_to_v3(paths)
+    with closing(sqlite3.connect(paths.db_path)) as con:  # a v3 detector run with a hit
+        con.execute(
+            "INSERT INTO detector_runs VALUES ('RUN-000001','C1','log_gap','{}','p','i',1,'o','L',"
+            "'2024-01-01')"
+        )
+        con.execute(
+            "INSERT INTO detector_hits VALUES ('HIT-000001','RUN-000001','C1','k','log_gap','k',"
+            "'low','[]','[]','[]','{}','e','[]','2024-01-01')"
+        )
+        con.commit()
+    n = len(Ledger(paths).read_all())
+    m = migrate_to_v4(paths)
+    assert m.migrated and (m.from_version, m.to_version) == (3, 4)
+    assert m.backup_name == "chainofproof.db.pre-v4"
+    assert sha256_file(paths.db_dir / "backups" / m.backup_name) == m.backup_sha256
+    assert V4_TABLES <= tables(paths)
+    with closing(sqlite3.connect(paths.db_path)) as con:
+        assert schema_version(con) == 4
+        assert con.execute("SELECT origin, agent_run_id FROM detector_hits").fetchall() == [
+            ("harness", None)
+        ]
+        assert con.execute("SELECT origin FROM detector_runs").fetchall() == [("harness",)]
+        assert con.execute("SELECT COUNT(*) FROM evidence").fetchone()[0] == 1
+    last = Ledger(paths).read_all()[-1]
+    assert last.action == "db_migrate" and last.details["to_version"] == 4
+    assert len(Ledger(paths).read_all()) == n + 1
+    assert not migrate_to_v4(paths).migrated and len(Ledger(paths).read_all()) == n + 1
+    assert Ledger(paths).verify().ok
+
+
+def test_v1_passes_through_every_step_to_v4(paths):
+    make_v1(paths)
+    assert migrate_to_v4(paths).to_version == 4
+    names = sorted(p.name for p in (paths.db_dir / "backups").iterdir())
+    assert names == [f"chainofproof.db.pre-v{i}" for i in (2, 3, 4)]
 
 
 def test_existing_backup_is_never_overwritten(paths):

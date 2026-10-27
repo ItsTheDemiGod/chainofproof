@@ -1,8 +1,9 @@
-"""Explicit, safe database migrations (schema versions 1 -> 2 -> 3).
+"""Explicit, safe database migrations (schema versions 1 -> 2 -> 3 -> 4).
 
-Version 2 adds the normalized-event tables, version 3 the graph and detector tables. Fresh
+Version 2 adds the normalized-event tables, version 3 the graph and detector tables, version 4 the
+agent tables (runs, calls, findings) plus ``agent_run_id``/``origin`` on the detector tables. Fresh
 databases are created at the latest version directly; an existing older database is changed only
-by ``migrate_to_v2`` / ``migrate_to_v3``: backup with the sqlite3 backup
+by ``migrate_to_v2`` / ``migrate_to_v3`` / ``migrate_to_v4``: backup with the sqlite3 backup
 API (the database is in WAL mode, so a raw file copy would be unsafe), one transaction, then a
 ``db_migrate`` ledger entry. Nothing is ever dropped or deleted.
 """
@@ -20,7 +21,7 @@ from chainofproof.custody.db import connect
 from chainofproof.custody.hashing import sha256_file
 from chainofproof.custody.ledger import Ledger
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 V2_DDL = [
     """CREATE TABLE IF NOT EXISTS norm_runs (
@@ -128,6 +129,81 @@ V3_DDL = [
 ]
 
 
+V4_DDL = [
+    """CREATE TABLE IF NOT EXISTS agent_runs (
+        run_id TEXT PRIMARY KEY,
+        case_id TEXT NOT NULL REFERENCES cases(case_id),
+        model TEXT NOT NULL,
+        num_ctx INTEGER NOT NULL,
+        seed INTEGER NOT NULL,
+        settings_json TEXT NOT NULL,
+        settings_sha256 TEXT NOT NULL,
+        prompt_version TEXT NOT NULL,
+        input_sha256 TEXT NOT NULL,
+        replay_of TEXT,
+        started_at TEXT NOT NULL,
+        finished_at TEXT,
+        status TEXT NOT NULL CHECK (status IN
+            ('running','completed','budget_exhausted','failed','aborted')),
+        stop_reason TEXT,
+        llm_calls INTEGER NOT NULL DEFAULT 0,
+        tool_calls INTEGER NOT NULL DEFAULT 0,
+        prompt_tokens INTEGER NOT NULL DEFAULT 0,
+        completion_tokens INTEGER NOT NULL DEFAULT 0,
+        trace_sha256 TEXT)""",
+    """CREATE TABLE IF NOT EXISTS agent_calls (
+        run_id TEXT NOT NULL REFERENCES agent_runs(run_id),
+        call_idx INTEGER NOT NULL,
+        kind TEXT NOT NULL CHECK (kind IN ('llm','tool')),
+        role TEXT NOT NULL,
+        name TEXT NOT NULL,
+        input_sha256 TEXT,
+        output_sha256 TEXT,
+        prompt_tokens INTEGER,
+        completion_tokens INTEGER,
+        duration_ms INTEGER,
+        ledger_id TEXT,
+        status TEXT NOT NULL,
+        PRIMARY KEY (run_id, call_idx))""",
+    """CREATE TABLE IF NOT EXISTS findings (
+        finding_id TEXT PRIMARY KEY,
+        run_id TEXT NOT NULL REFERENCES agent_runs(run_id),
+        case_id TEXT NOT NULL,
+        worker_role TEXT NOT NULL,
+        claim TEXT NOT NULL,
+        claim_type TEXT NOT NULL,
+        entities_json TEXT NOT NULL,
+        cited_event_uids_json TEXT NOT NULL,
+        cited_hit_ids_json TEXT NOT NULL,
+        confidence TEXT NOT NULL,
+        needs_json TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('verified','downgraded','rejected')),
+        verification_json TEXT NOT NULL,
+        revised_from TEXT,
+        created_at TEXT NOT NULL)""",
+    "CREATE INDEX IF NOT EXISTS ix_findings_case_run ON findings(case_id, run_id)",
+    "CREATE INDEX IF NOT EXISTS ix_findings_status ON findings(status)",
+]
+V4_ALTERS = [  # (table, column, definition): existing rows become harness rows
+    ("detector_runs", "agent_run_id", "TEXT"),
+    ("detector_runs", "origin", "TEXT NOT NULL DEFAULT 'harness'"),
+    ("detector_hits", "agent_run_id", "TEXT"),
+    ("detector_hits", "origin", "TEXT NOT NULL DEFAULT 'harness'"),
+]
+
+
+def create_v4_tables(conn: sqlite3.Connection) -> None:
+    """Create the version-4 tables and add the origin columns (idempotent)."""
+    for ddl in V4_DDL:
+        conn.execute(ddl)
+    for table, col, definition in V4_ALTERS:
+        have = {r[1] for r in conn.execute(f"PRAGMA table_info({table})")}  # noqa: S608 - fixed
+        if col not in have:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {definition}")  # noqa: S608
+    conn.execute("CREATE INDEX IF NOT EXISTS ix_runs_agent ON detector_runs(agent_run_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS ix_hits_agent ON detector_hits(agent_run_id)")
+
+
 def create_v2_tables(conn: sqlite3.Connection) -> None:
     """Create the version-2 tables (idempotent)."""
     for ddl in V2_DDL:
@@ -217,3 +293,12 @@ def migrate_to_v3(paths: Paths) -> MigrationResult:
     """Bring the database to schema version 3 (v1 databases pass through v2 first)."""
     migrate_to_v2(paths)
     return _step(paths, 3, create_v3_tables)
+
+
+def migrate_to_v4(paths: Paths) -> MigrationResult:
+    """Bring the database to schema version 4 (older databases pass through v2 and v3 first).
+
+    The returned result describes the v4 step only (``migrated`` False when already at v4).
+    """
+    migrate_to_v3(paths)
+    return _step(paths, 4, create_v4_tables)

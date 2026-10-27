@@ -69,6 +69,6 @@ def test_schema_version(paths):
     EvidenceStore(paths)
     con = sqlite3.connect(paths.db_path)
     assert con.execute("select version from schema_version").fetchall() == [
-        (3,)
+        (4,)
     ]  # fresh databases start at the latest version
     con.close()

@@ -107,6 +107,29 @@ class DetectorSettings(BaseModel):
     unmatched_connection: UnmatchedConnectionParams = UnmatchedConnectionParams()
 
 
+class AgentSettings(BaseModel):
+    """Agent budgets and limits (section ``agent`` of settings.yaml; rationale: docs/agents.md)."""
+
+    default_model: str = "qwen2.5:7b-instruct"
+    planner_max_rounds: int = 10
+    worker_max_steps: int = 8
+    max_llm_calls_per_run: int = 120
+    max_run_seconds: int = 1800
+    json_retries: int = 2
+    consecutive_failure_limit: int = 3
+    finding_revisions: int = 2
+    num_predict: int = 700
+    keep_alive: str = "10m"
+    max_prompt_fraction: float = 0.8
+    max_tool_output_chars: int = 3500
+    known_events_cap: int = 60
+    handoff_max_chars: int = 300
+    rationale_max_chars: int = 240
+    claim_max_chars: int = 400
+    ledger_llm_calls: bool = True
+    request_timeout_seconds: int = 300
+
+
 class CloudSettings(BaseModel):
     enabled: bool = False
     provider: str = "none"
@@ -120,6 +143,7 @@ class Settings(BaseModel):
     paths: PathSettings
     tools: ToolsSettings = ToolsSettings()
     detectors: DetectorSettings = DetectorSettings()
+    agent: AgentSettings = AgentSettings()
     optional_cloud: CloudSettings = CloudSettings()
     project_root: Path = PROJECT_ROOT
 

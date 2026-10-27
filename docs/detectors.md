@@ -37,8 +37,8 @@ uids, measures), so the same data always yields the same keys.
   for pipe names (Phase 4.1):** realistic benign data repeats ordinary pipe names (`spoolss`,
   `srvsvc`...) all day on every host, which would pair unrelated events. Pipe pairs must therefore
   be on the SAME virtual host, at most `pair_window_seconds` apart, and are matched one-to-one by
-  nearest time (an event is in at most one pair). This is a precision guard needed by the realistic
-  benign data, not a threshold tuned for a score: `min_abs_delta_seconds`, `min_independent_pairs`
+  nearest time (an event is in at most one pair). This guard was added to prevent spurious pairs; it
+  was not measured on the unguarded code, and it is not a threshold tuned for a score: `min_abs_delta_seconds`, `min_independent_pairs`
   and `agreement_seconds` were NOT changed, and `conn_id` pairing is untouched. A source is reported as
   consistently late/early when at least 2 pairs agree within 1 s and they involve 2+ partner sources
   or 2+ shared keys. A wrong clock is wrong against every partner while the partner only mirrors it,
