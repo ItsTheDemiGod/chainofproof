@@ -6,7 +6,7 @@ where every claim cites evidence IDs. Fully local (Ollama), free, reproducible.
 See `CLAUDE.md` for principles, architecture and phases.
 
 ## Status
-Phases 0 to 2 and 2.1 (synthetic/real alignment, key completion, detectability oracles) done. Next: Phase 3 (forensic tool layer).
+Phases 0 to 3 done (ingestion and custody, datasets and answer keys, cross-host links, forensic tool layer with normalized events). Next: Phase 4 (evidence graph and contradiction detection). See `docs/tools.md`.
 
 ## Setup (Windows, PowerShell)
 ```powershell
@@ -42,6 +42,13 @@ Set `CHAINOFPROOF_BASE_DIR` to use a throwaway data root instead of `data/`.
 | `scenario-build SCENARIO_ID clean\|perturbed [--force]` | verify dataset hashes, generate, create case `<id>_<variant>`, ingest everything |
 | `scenario-verify SCENARIO_ID` | dataset hashes, alignment, keys, generator determinism, adjudication list (exit 0/1) |
 | `scenario-key-show SCENARIO_ID clean\|perturbed` | answer key as tables |
+| `tools-check` | Hayabusa present? version, exe hash, rules-tree hash, can it run help |
+| `hayabusa-run EV-000001` | run Hayabusa on the working copy of one EVTX item (output in `data/runs/RUN-######/`) |
+| `db-migrate` | migrate the database to schema v2 (online backup first; no-op when already v2) |
+| `normalize CASE_ID [--evidence EV-ID]` | migrate if needed, normalize all evidence (agent view + eval layer) and run Hayabusa on every EVTX |
+| `events-stats CASE_ID` | per-source counts and event types (agent view only) |
+| `events-show CASE_ID [--host H] [--type T] [--limit N]` | normalized events (agent view only, max 50) |
+| `eval-coverage CASE_ID... [--baseline-md FILE]` | EVAL ONLY: answer-key coverage, count/alignment checks, Hayabusa-only baseline |
 
 Datasets live in `data/downloads/` (gitignored); see `docs/scenarios.md`. The current scenario is
 `credtheft_lateral_v3`: real EVTX captures plus labeled SYNTHETIC companions, including a few

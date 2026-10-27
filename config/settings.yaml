@@ -15,6 +15,10 @@ paths:
   runs: data/runs
   scenarios: scenarios
 
+tools:
+  hayabusa_dir: tools_bin/hayabusa
+  timeout_seconds: 300
+
 optional_cloud:
   enabled: false
   provider: none

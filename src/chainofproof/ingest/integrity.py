@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from chainofproof.config import Paths
-from chainofproof.custody.hashing import sha256_file
+from chainofproof.custody.hashing import sha256_file, sha256_json
 from chainofproof.custody.ledger import Ledger
 from chainofproof.errors import UserError
 from chainofproof.ingest.store import EvidenceStore
@@ -40,31 +40,49 @@ def _check(paths: Paths, rec: EvidenceRecord) -> list[str]:
     return problems
 
 
+def _verify_record(paths: Paths, rec: EvidenceRecord) -> IntegrityResult:
+    """Re-hash one vault file (no ledger entry). ``WARN:`` problems do not fail the check."""
+    problems = _check(paths, rec)
+    ok = all(p.startswith("WARN:") for p in problems)
+    return IntegrityResult(ok=ok, checked=1, problems=problems)
+
+
 def verify_evidence(paths: Paths, evidence_id: str) -> IntegrityResult:
     """Re-hash one vault file and compare with the stored hash and size; log to the ledger.
 
     Problems prefixed ``WARN:`` do not fail the check; all others do.
     """
     rec = _get(EvidenceStore(paths), evidence_id)
-    problems = _check(paths, rec)
-    ok = all(p.startswith("WARN:") for p in problems)
+    res = _verify_record(paths, rec)
     Ledger(paths).append(
         "integrity",
         "verify_evidence",
         input_hashes=[rec.sha256],
-        details={"evidence_id": evidence_id, "ok": ok, "problems": problems},
+        details={"evidence_id": evidence_id, "ok": res.ok, "problems": res.problems},
     )
-    return IntegrityResult(ok=ok, checked=1, problems=problems)
+    return res
 
 
 def verify_all(paths: Paths, case_id: str | None = None) -> IntegrityResult:
-    """Verify every evidence item (optionally one case)."""
+    """Verify every evidence item (optionally one case); ONE summary ledger entry in total."""
     items = EvidenceStore(paths).list_evidence(case_id)
-    results = [verify_evidence(paths, r.evidence_id) for r in items]
+    results = {r.evidence_id: _verify_record(paths, r) for r in items}
+    ok_count = sum(r.ok for r in results.values())
+    Ledger(paths).append(
+        "integrity",
+        "verify_all",
+        details={
+            "case_id": case_id,
+            "items_checked": len(items),
+            "ok_count": ok_count,
+            "problem_count": len(items) - ok_count,
+            "results_sha256": sha256_json({k: [r.ok, r.problems] for k, r in results.items()}),
+        },
+    )
     return IntegrityResult(
-        ok=all(r.ok for r in results),
+        ok=ok_count == len(items),
         checked=len(items),
-        problems=[p for r in results for p in r.problems],
+        problems=[p for r in results.values() for p in r.problems],
     )
 
 

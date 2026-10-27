@@ -68,5 +68,7 @@ def test_sql_injection_text_is_data(paths):
 def test_schema_version(paths):
     EvidenceStore(paths)
     con = sqlite3.connect(paths.db_path)
-    assert con.execute("select version from schema_version").fetchall() == [(1,)]
+    assert con.execute("select version from schema_version").fetchall() == [
+        (2,)
+    ]  # fresh databases start at v2
     con.close()

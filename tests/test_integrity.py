@@ -33,6 +33,20 @@ def test_verify_ok(paths, ev):
     assert verify_all(paths).ok and verify_all(paths, "C1").checked == 1
 
 
+def test_verify_all_writes_one_summary_entry(paths, ev, make_file):
+    ingest_evidence(paths, "C1", make_file("b.log", b"second"))
+    ledger = Ledger(paths)
+    n = len(ledger.read_all())
+    assert verify_all(paths, "C1").checked == 2
+    new = ledger.read_all()[n:]
+    assert [e.action for e in new] == ["verify_all"]
+    d = new[0].details
+    assert (d["case_id"], d["items_checked"], d["ok_count"], d["problem_count"]) == ("C1", 2, 2, 0)
+    assert len(d["results_sha256"]) == 64
+    verify_evidence(paths, ev.evidence_id)
+    assert ledger.read_all()[-1].action == "verify_evidence"
+
+
 def test_unknown_id(paths, ev):
     with pytest.raises(IntegrityError, match="unknown evidence id"):
         verify_evidence(paths, "EV-999999")

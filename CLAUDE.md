@@ -36,7 +36,7 @@ Agents may all use the same local model with different prompts and different too
 - Phase 2: Datasets and ground truth (answer keys) [DONE]
 - Phase 2.1: Synthetic/real alignment and key completion [DONE]
 - Phase 2.2: Cross-host synthetic links [DONE]
-- Phase 3: Forensic tool layer and normalized event format [TODO]
+- Phase 3: Forensic tool layer and normalized event format [DONE]
 - Phase 4: Evidence graph and contradiction detection [TODO]
 - Phase 5: Agent core (LLM client, planner loop, citation verifier) [TODO]
 - Phase 6: Skeptic, calibration, missing-evidence reasoning [TODO]
@@ -45,7 +45,13 @@ Agents may all use the same local model with different prompts and different too
 - Phase 9: Evaluation (metrics, baseline, ablations, model comparison) [TODO]
 - Phase 10: Write-up and demo [TODO]
 
+## Two layers: agent view and eval layer (Phase 3, enforced by tests)
+1. The `agents` package and the agent-facing `tools/query.py` (and any future agent/report/ui/llm package) must never import the answer keys, the `scenarios` key modules, the `eval` package, or touch the `event_eval_meta` table. Only the ingest-side parsers/normalizer in `tools/` may produce eval metadata, through the single function in `eval/meta_store.py`.
+2. The answer key is never given to any agent or LLM prompt.
+3. Citation IDs for events are EVT ids (`EVT-<12hex>`); EV ids (files) are internal only and never appear in the agent view, as do original filenames, source keys, real hostnames and real timestamps.
+
 ## Conventions
+- IDs added in Phase 3: event ids `EVT-<12hex>` (sha256 of evidence sha256 + ":" + record locator), run ids `RUN-000001`, detection ids `DET-000001`; evidence labels `<KIND>-<6hex>` (EVTX/FSTL/AUTH).
 - Python 3.11+, src layout, package name chainofproof, type hints everywhere, pydantic v2 for schemas, pathlib for paths.
 - Use the logging module in library code (no print), rich/typer for CLI output.
 - ruff for lint and format, pytest for tests. Every module gets tests. Tests must not require Ollama unless marked with @pytest.mark.llm.

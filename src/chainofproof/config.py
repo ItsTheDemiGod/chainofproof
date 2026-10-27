@@ -58,6 +58,14 @@ class Paths(BaseModel):
         self.runs_dir.mkdir(parents=True, exist_ok=True)
 
 
+class ToolsSettings(BaseModel):
+    """External forensic tools (Phase 3). ``hayabusa_dir`` is resolved against the project root."""
+
+    hayabusa_dir: Path = Path("tools_bin/hayabusa")
+    timeout_seconds: int = 300
+    exe_glob: str = "hayabusa*.exe"  # tests point this at a fake executable
+
+
 class CloudSettings(BaseModel):
     enabled: bool = False
     provider: str = "none"
@@ -69,6 +77,7 @@ class CloudSettings(BaseModel):
 class Settings(BaseModel):
     ollama: OllamaSettings
     paths: PathSettings
+    tools: ToolsSettings = ToolsSettings()
     optional_cloud: CloudSettings = CloudSettings()
     project_root: Path = PROJECT_ROOT
 
@@ -89,6 +98,8 @@ def load_settings(path: Path = SETTINGS_PATH, env_path: Path | None = None) -> S
     for name in PathSettings.model_fields:
         p = getattr(s.paths, name)
         setattr(s.paths, name, p if p.is_absolute() else s.project_root / p)
+    hd = s.tools.hayabusa_dir
+    s.tools.hayabusa_dir = hd if hd.is_absolute() else s.project_root / hd
     return s
 
 

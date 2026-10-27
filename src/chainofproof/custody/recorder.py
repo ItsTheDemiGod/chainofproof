@@ -51,6 +51,7 @@ class ToolRun:
         self.ledger, self.actor, self.command = ledger, actor, command
         self.input_hashes = list(input_hashes)
         self.output: Any = None
+        self.details: dict[str, Any] = {}  # extra ledger details (counts, ids; never raw output)
         self.entry: LedgerEntry | None = None
         self._t0 = 0.0
 
@@ -59,7 +60,10 @@ class ToolRun:
         return self
 
     def __exit__(self, exc_type, exc, tb) -> bool:
-        details: dict[str, Any] = {"duration_s": round(time.perf_counter() - self._t0, 6)}
+        details: dict[str, Any] = {
+            **self.details,
+            "duration_s": round(time.perf_counter() - self._t0, 6),
+        }
         if exc_type is not None:
             details["status"] = "failed"
             details["error_type"] = exc_type.__name__

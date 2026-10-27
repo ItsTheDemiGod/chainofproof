@@ -42,14 +42,23 @@ def entry(**kw):
 def test_committed_file_is_valid_and_drafts_are_flagged(adj):
     assert adj.policy == POLICY
     assert len(adj.entries) == 10
-    assert {e.verdict for e in adj.entries} == {Verdict.unclear, Verdict.not_attack}
-    assert all("pending human review" in e.decided_by for e in adj.entries)
+    assert {e.verdict for e in adj.entries} == {
+        Verdict.true_finding,
+        Verdict.unclear,
+        Verdict.not_attack,
+    }
+    assert all(e.decided_by.startswith("reviewed and approved by Demian") for e in adj.entries)
+    assert {e.id for e in adj.entries if e.verdict == Verdict.true_finding} == {
+        "GT-ADJ-001",
+        "GT-ADJ-006",
+    }
 
 
 def test_policy_scoring(adj, v3):
     keys = list(v3.keys.values())
     assert adj.score("s3_psexec_smb", 9806, keys) == "key"  # the service ImagePath write
-    assert adj.score("s3_psexec_smb", 9813, keys) == "unclear"  # listed unclear
+    assert adj.score("s3_psexec_smb", 9813, keys) == "true_positive"  # listed true_finding
+    assert adj.score("s3_psexec_smb", 9810, keys) == "unclear"  # listed unclear
     assert adj.score("s4_renamed_psexec", 409654, keys) == "false_positive"  # listed not_attack
     assert adj.score("s3_psexec_smb", 99999, keys) == "unlisted"  # not listed at all
     extra = Adjudication(

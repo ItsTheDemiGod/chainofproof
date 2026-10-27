@@ -65,3 +65,29 @@ def v3(tmp_path_factory) -> V3Data:
         dirs[v] = tmp_path_factory.mktemp(f"v3_{v.value}")
         generate_variant(scn, inv, v, dirs[v])
     return V3Data(scn, inv, insp, keys, dirs)
+
+
+def synthetic_env(base: Path, v3: V3Data, files: tuple[str, ...] | None = None):
+    """Paths with both v3 cases holding the SYNTHETIC companion files, normalized (no Hayabusa)."""
+    from chainofproof.ingest.ingest import ingest_evidence
+    from chainofproof.ingest.store import EvidenceStore
+    from chainofproof.tools.case_run import normalize_case
+
+    paths = get_paths(base_dir=base)
+    paths.ensure_dirs()
+    store = EvidenceStore(paths)
+    rows = {}
+    for v in Variant:
+        case = f"{v3.scn.scenario_id}_{v.value}"
+        store.create_case(case, "t", f"{v3.scn.scenario_id} ({v.value})")
+        for f in sorted(v3.dirs[v].iterdir()):
+            if f.suffix in (".csv", ".log") and (files is None or f.name in files):
+                ingest_evidence(paths, case, f)
+        rows[case] = normalize_case(paths, case, hayabusa=False)
+    return paths, rows
+
+
+@pytest.fixture(scope="session")
+def synth_norm(v3, tmp_path_factory):
+    """Both v3 variants, synthetic sources only, normalized once per session."""
+    return synthetic_env(tmp_path_factory.mktemp("norm") / "base", v3)

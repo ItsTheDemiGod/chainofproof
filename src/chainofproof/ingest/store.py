@@ -11,6 +11,7 @@ from chainofproof.config import Paths
 from chainofproof.custody.db import connect
 from chainofproof.custody.hashing import iso_utc, utc_now
 from chainofproof.custody.ledger import Ledger
+from chainofproof.custody.migrations import SCHEMA_VERSION, create_v2_tables
 from chainofproof.errors import UserError
 from chainofproof.schemas.custody import (
     CASE_ID_PATTERN,
@@ -68,12 +69,14 @@ class EvidenceStore:
             conn.execute("COMMIT")
 
     def init_db(self) -> None:
-        """Create tables if missing and set schema_version = 1."""
+        """Create tables if missing. A fresh database is created at schema version 2 directly;
+        an existing version-1 database is left alone (see ``custody.migrations.migrate_to_v2``)."""
         with self._conn() as conn:
             for ddl in SCHEMA:
                 conn.execute(ddl)
             if conn.execute("SELECT 1 FROM schema_version").fetchone() is None:
-                conn.execute("INSERT INTO schema_version(version) VALUES (1)")
+                create_v2_tables(conn)
+                conn.execute("INSERT INTO schema_version(version) VALUES (?)", (SCHEMA_VERSION,))
 
     # ---- cases ---------------------------------------------------------------------------
     def create_case(self, case_id: str, title: str = "", description: str = "") -> CaseRecord:
