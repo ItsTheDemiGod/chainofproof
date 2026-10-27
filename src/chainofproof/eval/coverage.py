@@ -22,7 +22,7 @@ from chainofproof.eval.gt_link import (
 )
 from chainofproof.scenarios.dataset import scenario_dir
 from chainofproof.scenarios.inventory import load_inventory
-from chainofproof.scenarios.source_map import load_case_scenario
+from chainofproof.scenarios.source_map import case_key_path, load_case_scenario
 from chainofproof.schemas.adjudication import Adjudication, load_adjudication
 from chainofproof.schemas.scenario import AnswerKey, Scenario, SourceKind, Variant, load_key
 
@@ -165,7 +165,7 @@ def run_coverage(
     """Run all coverage checks for a normalized case."""
     scn, variant = load_case_scenario(case_id)
     d = scenario_dir(scn.scenario_id)
-    key = load_key(d / f"key_{variant.value}.yaml", scn)
+    key = load_key(case_key_path(case_id), scn)
     adj = load_adjudication(d / "adjudication.yaml")
     idx = build_index(paths, case_id)
     rep = CoverageReport(case_id, variant)

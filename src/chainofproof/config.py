@@ -128,6 +128,8 @@ class AgentSettings(BaseModel):
     claim_max_chars: int = 400
     ledger_llm_calls: bool = True
     request_timeout_seconds: int = 300
+    max_arg_errors_per_worker: int = 4
+    mandatory_correlator_review: bool = False
 
 
 class CloudSettings(BaseModel):

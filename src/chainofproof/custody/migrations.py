@@ -1,4 +1,6 @@
-"""Explicit, safe database migrations (schema versions 1 -> 2 -> 3 -> 4).
+"""Explicit, safe database migrations (schema versions 1 -> 2 -> 3 -> 4 -> 5).
+
+Version 5 adds the mechanical counters and the DEV/TEST split to ``agent_runs``.
 
 Version 2 adds the normalized-event tables, version 3 the graph and detector tables, version 4 the
 agent tables (runs, calls, findings) plus ``agent_run_id``/``origin`` on the detector tables. Fresh
@@ -21,7 +23,7 @@ from chainofproof.custody.db import connect
 from chainofproof.custody.hashing import sha256_file
 from chainofproof.custody.ledger import Ledger
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 V2_DDL = [
     """CREATE TABLE IF NOT EXISTS norm_runs (
@@ -192,6 +194,22 @@ V4_ALTERS = [  # (table, column, definition): existing rows become harness rows
 ]
 
 
+V5_ALTERS = [  # (table, column, definition): existing rows keep the defaults
+    ("agent_runs", "arg_errors", "INTEGER DEFAULT 0"),
+    ("agent_runs", "format_errors", "INTEGER DEFAULT 0"),
+    ("agent_runs", "duplicate_refusals", "INTEGER DEFAULT 0"),
+    ("agent_runs", "split", "TEXT"),
+]
+
+
+def create_v5_tables(conn: sqlite3.Connection) -> None:
+    """Add the version-5 columns of ``agent_runs`` (idempotent)."""
+    for table, col, definition in V5_ALTERS:
+        have = {r[1] for r in conn.execute(f"PRAGMA table_info({table})")}  # noqa: S608 - fixed
+        if col not in have:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {definition}")  # noqa: S608
+
+
 def create_v4_tables(conn: sqlite3.Connection) -> None:
     """Create the version-4 tables and add the origin columns (idempotent)."""
     for ddl in V4_DDL:
@@ -302,3 +320,12 @@ def migrate_to_v4(paths: Paths) -> MigrationResult:
     """
     migrate_to_v3(paths)
     return _step(paths, 4, create_v4_tables)
+
+
+def migrate_to_v5(paths: Paths) -> MigrationResult:
+    """Bring the database to schema version 5 (older databases pass through v2-v4 first).
+
+    The returned result describes the v5 step only (``migrated`` False when already at v5).
+    """
+    migrate_to_v4(paths)
+    return _step(paths, 5, create_v5_tables)

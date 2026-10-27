@@ -104,6 +104,38 @@ differs from `num_ctx` (see `docs/decisions.md` for what this server exposes).
 | claim_max_chars | 400 | one claim per finding |
 | ledger_llm_calls | true | rule A5 |
 | request_timeout_seconds | 300 | not in the original brief; a cold 7B load can take a minute, 5 minutes is a clear hang |
+| max_arg_errors_per_worker | 4 | Phase 5.1: invalid-argument calls are free of steps but capped per worker (see below) |
+| mandatory_correlator_review | false | Phase 5.1: optional forced correlator delegation; off by default |
+
+## Phase 5.1 changes (interface fixes)
+
+Observed in the first real DEV runs (Phase 5): the tool listing showed argument names but not types, so
+the model passed lists where strings were expected (all 57 `search_events` calls of one run failed), never saw
+an EVT id and cited source labels, never delegated detector work, and repeated near-identical findings.
+Mechanical fixes (prompt v2, see `docs/prompt_changelog.md`):
+
+* TOOLS section generated from the registry (typed signature lines, generic time example), a WORKERS
+  section in the planner prompt, a CITATION FORMAT section, a one-line legend at the top of every
+  observation ("ids: EVT-... events, HIT-... hits; labels are sources, not citable"), templated
+  argument errors plus the failed tool's signature line.
+* `record_finding` pre-check: a cited id that is not `EVT-<12hex>` / `HIT-<6 digits>` is returned as
+  `format error: ...` without storing anything and counted in `agent_runs.format_errors`. The first one of a
+  worker is free (no step), later ones consume a step. Well-formed ids that do not exist still go to the
+  verifier and are stored as rejected (V1).
+* Duplicate suppression: a finding is refused (not stored) when a verified/downgraded finding of the same
+  run has the same claim type and cited-id set, or the same normalised claim text; a revision is compared
+  with everything except its own ancestors. Counted in `agent_runs.duplicate_refusals`.
+* Argument-error budget: invalid-argument calls do not consume worker steps and do not count toward
+  `consecutive_failure_limit`; instead each worker may make `max_arg_errors_per_worker` (4) of them, then it
+  ends with `arg_error_budget` in its report. Rationale: a mistyped argument is recoverable and the
+  templated message plus usage line is exactly the information needed to fix it; charging a step would let
+  one syntax slip eat the whole investigation, while an unlimited budget would allow loops (the cap bounds
+  them, and every attempt still costs an LLM call against `max_llm_calls_per_run`). Permission errors still
+  consume a step (they are decisions, not typos).
+* `agent.mandatory_correlator_review` (default false, not enabled in this phase): when true the planner
+  cannot finish before delegating once to the correlator, and after the last round the orchestrator injects
+  one correlator delegation with a fixed generic task text.
+* `agent_runs.split` records `dev` / `test` / null (see `docs/evaluation_protocol.md`).
 
 ## Commands
 

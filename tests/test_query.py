@@ -106,7 +106,16 @@ FORBIDDEN = re.compile(
 def agent_side_files():
     tools = ("query", "graph_query", "registry", "registry_args", "loader", "scope")
     files = [SRC / "tools" / f"{n}.py" for n in tools]
-    for pkg in ("agents", "report", "ui", "llm", "security", "graph", "tools/detectors"):
+    for pkg in (
+        "agents",
+        "report",
+        "ui",
+        "llm",
+        "security",
+        "graph",
+        "tools/detectors",
+        "protocol",
+    ):
         files += sorted((SRC / pkg).rglob("*.py")) if (SRC / pkg).is_dir() else []
     return files
 
@@ -124,6 +133,8 @@ def test_agent_side_source_has_no_forbidden_imports(path):
         "chainofproof.tools.registry",
         "chainofproof.tools.detectors",
         "chainofproof.graph.builder",
+        "chainofproof.protocol.guard",
+        "chainofproof.tools.describe",
     ],
 )
 def test_agent_modules_do_not_load_eval_or_scenarios_at_import_time(module):

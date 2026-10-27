@@ -23,13 +23,14 @@ from chainofproof.schemas.findings import (
 RATIONALE_MAX = 240  # = settings.agent.rationale_max_chars default
 HANDOFF_MAX = 300  # = settings.agent.handoff_max_chars default
 TASK_MAX = 300
+MAX_CITED = 8  # per list; long id lists hit the num_predict cap (prompt v3, changelog)
 ID_MAX = 20
 
 
 class HypothesisUpdate(Strict):
     """Change of status of an existing hypothesis (H1, H2, ...)."""
 
-    id: str = Field(pattern=r"^H\d{1,3}$")
+    id: str = Field(max_length=20)  # like H1; an unknown id is ignored and counted, not an error
     status: Literal["open", "supported", "refuted"]
     note: str = Field(default="", max_length=120)
 
@@ -71,8 +72,8 @@ class FindingDraft(Strict):
     ips: list[str] = Field(default_factory=list, max_length=8)
     time_start: str | None = None
     time_end: str | None = None
-    cited_event_uids: list[str] = Field(default_factory=list, max_length=20)
-    cited_hit_ids: list[str] = Field(default_factory=list, max_length=20)
+    cited_event_uids: list[str] = Field(default_factory=list, max_length=MAX_CITED)
+    cited_hit_ids: list[str] = Field(default_factory=list, max_length=MAX_CITED)
     confidence: Confidence = "low"
     needs: list[str] = Field(default_factory=list, max_length=NEEDS_MAX)
     revises: str | None = Field(default=None, max_length=ID_MAX)  # run-local id, e.g. F2

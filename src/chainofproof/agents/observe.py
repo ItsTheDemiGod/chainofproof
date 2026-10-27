@@ -18,6 +18,7 @@ from chainofproof.ingest.sanitize import clean
 OPEN_ESC, CLOSE_ESC = "‹‹‹", "›››"  # single guillemets, tripled
 LINE_MAX = 600
 _ID = re.compile(r"[^A-Za-z0-9_.:-]")
+LABEL = re.compile(r"^(EVTX|FSTL|AUTH)-[0-9a-f]{6}$")
 _EVENT_KEYS = (("user", "user"), ("process_image", "proc"), ("target_image", "target"),
                ("pipe_name", "pipe"), ("conn_id", "conn"), ("src_ip", "src"), ("dst_ip", "dst"),
                ("dst_host", "dst_host"), ("logon_type", "logon"), ("record_id", "rec"))  # fmt: skip
@@ -72,13 +73,14 @@ def event_summary(e: dict[str, Any]) -> str:
 def hit_line(h: dict[str, Any]) -> str:
     """One compact line per detector hit: id, kind, severity, hosts, measures, explanation."""
     m = " ".join(
-        f"{k}={v}" for k, v in sorted(h["measures"].items())
+        f"{'source_' + k if LABEL.match(str(v)) else k}={v}"  # a label is a source, not citable
+        for k, v in sorted(h["measures"].items())
         if isinstance(v, int | float | str) and not isinstance(v, bool) and len(str(v)) <= 60
     )  # fmt: skip
     first = h["limitations"][0] if h["limitations"] else ""
     uids = ",".join(h["event_uids"][:4])
     return (f"{h['hit_id']} {h['detector']}/{h['kind']} sev={h['severity']} "
-            f"hosts={','.join(h['hosts'])} {m} events={uids} | {h['explanation']} "
+            f"hosts={','.join(h['hosts'])} {m} cite_events={uids} | {h['explanation']} "
             f"| limit: {first}")  # fmt: skip
 
 

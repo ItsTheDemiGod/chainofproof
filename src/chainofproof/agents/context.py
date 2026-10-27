@@ -26,6 +26,7 @@ from chainofproof.custody.hashing import sha256_json, sha256_text
 from chainofproof.custody.ledger import Ledger
 from chainofproof.llm.base import CallCtx, CallRecord, LLMClient, LLMResult, Messages
 from chainofproof.llm.budget import PromptTooLarge
+from chainofproof.tools.describe import tool_signature
 from chainofproof.tools.registry import TOOLS, ToolError, call_tool
 
 ERROR_CAP = 200
@@ -86,6 +87,8 @@ class RunCtx:
     finding_ids: list[str] = field(default_factory=list)  # FND ids in order; local id = F<i+1>
     finding_status: dict[str, str] = field(default_factory=dict)
     revision_depth: dict[str, int] = field(default_factory=dict)
+    finding_meta: dict[str, tuple[str, frozenset[str], str]] = field(default_factory=dict)
+    parent_of: dict[str, str] = field(default_factory=dict)  # FND id -> the finding it revises
     tool_names: dict[str, int] = field(default_factory=dict)
     delegations: list[tuple[str, int]] = field(default_factory=list)  # (worker role, task chars)
     last_events: list[str] = field(default_factory=list)
@@ -207,7 +210,10 @@ class RunCtx:
             result = call_tool(role, name, a, self.paths, self.case_id, agent_run_id=self.hit_scope)
         except ToolError as e:
             err = str(e)[:ERROR_CAP]
-            out = ToolOutcome(False, f"tool_error: {err}", error_kind=error_kind(err))
+            kind = error_kind(err)
+            sig = tool_signature(name) if kind in ("args", "failed") else None
+            text = f"tool_error: {err}" + (f"\nusage: {sig}" if sig else "")
+            out = ToolOutcome(False, text, error_kind=kind)
         except Exception as e:  # noqa: BLE001 - an unexpected failure counts toward the stop rule
             err = f"internal error {type(e).__name__}"
             out = ToolOutcome(False, f"tool_error: {err}", error_kind="internal")
@@ -227,6 +233,7 @@ class RunCtx:
         )  # fmt: skip
         self.counts["tool_calls"] += 1
         self.counts["tool_errors"] += not out.ok
+        self.counts["arg_errors"] += out.error_kind == "args"
         self.tool_names[safe] = self.tool_names.get(safe, 0) + 1
         store.insert_call(self.paths, self.run_id, idx, "tool", role, safe, input_sha256=args_sha,
                           output_sha256=osha, duration_ms=ms, ledger_id=entry.ledger_id,

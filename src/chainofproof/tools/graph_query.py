@@ -139,7 +139,7 @@ def _limit(limit: int | None) -> int:
 
 def _need(g: nx.MultiDiGraph, node: str) -> None:
     if node not in g:
-        raise GraphQueryError(f"unknown node id {node[:80]!r} in this case")
+        raise GraphQueryError("unknown node id in this case")
 
 
 def _attrs(d: dict[str, Any], skip: set[str]) -> dict[str, Any]:

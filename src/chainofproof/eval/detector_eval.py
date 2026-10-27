@@ -24,8 +24,7 @@ from dataclasses import dataclass, field
 
 from chainofproof.config import Paths
 from chainofproof.eval.gt_link import EvalIndex, build_index
-from chainofproof.scenarios.dataset import scenario_dir
-from chainofproof.scenarios.source_map import load_case_scenario
+from chainofproof.scenarios.source_map import case_key_path, load_case_scenario
 from chainofproof.schemas.scenario import AnswerKey, Variant, load_key
 from chainofproof.tools.detectors import DETECTORS
 from chainofproof.tools.detectors.base import Hit
@@ -213,6 +212,6 @@ def run_all_stored(paths: Paths, case_id: str) -> list[Hit]:
 def evaluate_case(paths: Paths, case_id: str) -> CaseEval:
     """Run all detectors on a real case and score them against its answer key."""
     scn, variant = load_case_scenario(case_id)
-    key = load_key(scenario_dir(scn.scenario_id) / f"key_{variant.value}.yaml", scn)
+    key = load_key(case_key_path(case_id), scn)
     resolve, label_of = index_resolvers(build_index(paths, case_id))
     return match_hits(key, run_all_stored(paths, case_id), resolve, label_of, variant, case_id)

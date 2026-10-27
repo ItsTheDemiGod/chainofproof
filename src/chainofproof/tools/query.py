@@ -19,12 +19,13 @@ from pydantic import BaseModel
 from chainofproof.config import Paths
 from chainofproof.custody.db import connect
 from chainofproof.errors import UserError
-from chainofproof.schemas.events import AgentDetection, NormalizedEvent
+from chainofproof.schemas.events import AgentDetection, EventType, NormalizedEvent
 from chainofproof.tools.norm_store import LATEST_RUNS
 
 DEFAULT_LIMIT = 25
 MAX_LIMIT = 50
 MAX_TEXT = 100
+EVENT_TYPES = frozenset(t.value for t in EventType)
 _ISO = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?Z$")
 _JSON_COLUMNS = {"fields_json": "fields", "injection_flags_json": "injection_flags"}
 _HIDDEN = {"norm_run_id", "ord"}
@@ -83,7 +84,7 @@ def _iso(value: str | datetime | None, name: str) -> str | None:
     if isinstance(value, datetime):
         return value.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
     if not _ISO.match(value):
-        raise QueryError(f"{name} must look like 2024-03-12T09:00:00Z")
+        raise QueryError(f"{name} must be an ISO-8601 UTC string like 2000-01-01T00:00:00Z")
     base, _, frac = value.rstrip("Z").partition(".")
     return f"{base}.{(frac or '0').ljust(6, '0')}Z"
 
@@ -147,14 +148,44 @@ def list_evidence_labels(paths: Paths, case_id: str) -> list[LabelInfo]:
     return out
 
 
+MAX_VALUES = 10
+
+
+def _values(val, name: str) -> list | None:
+    """One value or a list of up to 10 values; None or an empty list means no filter."""
+    if val is None:
+        return None
+    vals = list(val) if isinstance(val, list | tuple) else [val]
+    if len(vals) > MAX_VALUES:
+        raise QueryError(f"{name} accepts at most {MAX_VALUES} values")
+    return [getattr(v, "value", v) for v in vals] or None
+
+
+def _in_clauses(filters: dict[str, object], prefix: str = "e") -> tuple[list[str], list]:
+    """Parameterized ``col IN (?,..)`` clauses (placeholders only are string-built)."""
+    clauses, args = [], []
+    for col, val in filters.items():
+        vals = _values(val, col)
+        if vals is None:
+            continue
+        if col == "event_type" and any(v not in EVENT_TYPES for v in vals):
+            raise QueryError("event_type must be one of the normalized event types")
+        clauses.append(f"{prefix}.{col} IN ({','.join('?' * len(vals))})")
+        args += vals
+    return clauses, args
+
+
 def search_events(
-    paths: Paths, case_id: str, *, host: str | None = None, event_type: str | None = None,
-    user: str | None = None, process_image: str | None = None, text: str | None = None,
-    time_from: str | datetime | None = None, time_to: str | datetime | None = None,
-    evidence_label: str | None = None, conn_id: str | None = None, event_id: int | None = None,
+    paths: Paths, case_id: str, *, host=None, event_type=None, user=None, process_image=None,
+    text: str | None = None, time_from: str | datetime | None = None,
+    time_to: str | datetime | None = None, evidence_label=None, conn_id=None, event_id=None,
     limit: int | None = None, offset: int = 0,
 ) -> EventPage:  # fmt: skip
-    """Filtered, bounded, time-ordered event search (all filters ANDed)."""
+    """Filtered, bounded, time-ordered event search (all filters ANDed).
+
+    host, event_type, user, process_image, evidence_label, conn_id and event_id take one value or
+    a list of up to 10 values (an empty list is no filter).
+    """
     clauses, args = ["1=1"], _case_args(case_id)
     exact = {
         "host": host,
@@ -165,10 +196,9 @@ def search_events(
         "conn_id": conn_id,
         "event_id": event_id,
     }
-    for col, val in exact.items():
-        if val is not None:
-            clauses.append(f"e.{col} = ?")
-            args.append(val)
+    more, vals = _in_clauses(exact)
+    clauses += more
+    args += vals
     lo, hi = _iso(time_from, "time_from"), _iso(time_to, "time_to")
     if lo:
         clauses.append("e.timestamp >= ?")
@@ -208,10 +238,9 @@ def get_detections(
 ) -> DetectionPage:  # fmt: skip
     """Hayabusa detections of the latest run, by source label and/or linked event."""
     clauses, args = ["1=1"], _case_args(case_id)
-    for col, val in (("evidence_label", evidence_label), ("event_uid", event_uid)):
-        if val is not None:
-            clauses.append(f"d.{col} = ?")
-            args.append(val)
+    more, vals = _in_clauses({"evidence_label": evidence_label, "event_uid": event_uid}, "d")
+    clauses += more
+    args += vals
     base = f"FROM detections d WHERE d.norm_run_id IN ({LATEST_RUNS}) AND {' AND '.join(clauses)}"
     n = _limit(limit)
     with closing(connect(paths.db_path)) as conn:

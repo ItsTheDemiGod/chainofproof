@@ -1,17 +1,33 @@
 """Argument and result models of the registered tools (split out of ``registry``).
 
 Every argument model rejects unknown arguments; the registry validates agent input with them.
+String filters accept one value or a list of up to 10 values (an empty list means no filter).
 """
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Annotated, Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
+from chainofproof.schemas.events import EventType
 from chainofproof.tools import graph_query as gq
 from chainofproof.tools import query as q
+from chainofproof.tools.describe import ISO_EXAMPLE
 from chainofproof.tools.detectors.base import Hit
+
+MAX_VALUES = 10
+ISO_PATTERN = r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?Z$"
+Str = Annotated[str, StringConstraints(max_length=200)]
+StrOrList = Str | Annotated[list[Str], Field(max_length=MAX_VALUES)]
+IntOrList = int | Annotated[list[int], Field(max_length=MAX_VALUES)]
+TypeOrList = EventType | Annotated[list[EventType], Field(max_length=MAX_VALUES)]
+IsoTime = Annotated[
+    str,
+    StringConstraints(pattern=ISO_PATTERN),
+    Field(description=f"ISO-8601 UTC string like {ISO_EXAMPLE}"),
+]
+Limit = Annotated[int | None, Field(description="int<=50 (default 25)")]
 
 
 class Args(BaseModel):
@@ -27,17 +43,17 @@ class NoArgs(Args):
 class SearchArgs(Args):
     """Filters of search_events (all ANDed)."""
 
-    host: str | None = None
-    event_type: str | None = None
-    user: str | None = None
-    process_image: str | None = None
+    host: StrOrList | None = None
+    event_type: TypeOrList | None = None
+    user: StrOrList | None = None
+    process_image: StrOrList | None = None
     text: str | None = None
-    time_from: str | None = None
-    time_to: str | None = None
-    evidence_label: str | None = None
-    conn_id: str | None = None
-    event_id: int | None = None
-    limit: int | None = None
+    time_from: IsoTime | None = None
+    time_to: IsoTime | None = None
+    evidence_label: StrOrList | None = None
+    conn_id: StrOrList | None = None
+    event_id: IntOrList | None = None
+    limit: Limit = None
     offset: int = 0
 
 
@@ -48,20 +64,20 @@ class GetEventArgs(Args):
 
 
 class TimelineArgs(Args):
-    """A host and a virtual time window."""
+    """A host (or several) and a virtual time window."""
 
-    host: str
-    start: str
-    end: str
-    limit: int | None = None
+    host: StrOrList
+    start: IsoTime
+    end: IsoTime
+    limit: Limit = None
 
 
 class DetectionsArgs(Args):
     """Hayabusa detections by source label and/or event."""
 
-    evidence_label: str | None = None
+    evidence_label: StrOrList | None = None
     event_uid: str | None = None
-    limit: int | None = None
+    limit: Limit = None
 
 
 class LabelArgs(Args):
@@ -81,8 +97,8 @@ class NeighborsArgs(Args):
 
     node_id: str
     relation: str | None = None
-    direction: str = "both"
-    limit: int | None = None
+    direction: str = Field(default="both", description="enum[out|in|both]")
+    limit: Limit = None
 
 
 class PathsArgs(Args):
@@ -97,7 +113,7 @@ class PathsArgs(Args):
 class LimitArgs(Args):
     """Only a limit."""
 
-    limit: int | None = None
+    limit: Limit = None
 
 
 class GetHitsArgs(Args):
@@ -105,7 +121,7 @@ class GetHitsArgs(Args):
 
     detector: str | None = None
     hit_id: str | None = None
-    limit: int | None = None
+    limit: Limit = None
 
 
 class LabelList(BaseModel):

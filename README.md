@@ -44,7 +44,7 @@ Set `CHAINOFPROOF_BASE_DIR` to use a throwaway data root instead of `data/`.
 | `scenario-key-show SCENARIO_ID clean\|perturbed` | answer key as tables |
 | `tools-check` | Hayabusa present? version, exe hash, rules-tree hash, can it run help |
 | `hayabusa-run EV-000001` | run Hayabusa on the working copy of one EVTX item (output in `data/runs/RUN-######/`) |
-| `db-migrate` | migrate the database to the latest schema (v4; online backup first; no-op when current) |
+| `db-migrate` | migrate the database to the latest schema (v5; online backup first; no-op when current) |
 | `normalize CASE_ID [--evidence EV-ID]` | migrate if needed, normalize all evidence (agent view + eval layer) and run Hayabusa on every EVTX |
 | `events-stats CASE_ID` | per-source counts and event types (agent view only) |
 | `events-show CASE_ID [--host H] [--type T] [--limit N]` | normalized events (agent view only, max 50) |
@@ -59,6 +59,8 @@ Set `CHAINOFPROOF_BASE_DIR` to use a throwaway data root instead of `data/`.
 | `agent-runs [--case CASE_ID]` / `findings-show RUN_ID [--status S]` | list runs / findings of a run (claim text is model output, capped at 120 characters) |
 | `agent-trace RUN_ID [--limit N]` | structured summary of a run's trace (no model text) |
 | `agent-replay RUN_ID` | offline replay against the recorded LLM replies; verifies findings, statuses and tool-call sequence |
+| `agent-freeze --confirm [--note T]` | HUMANS ONLY (rule E3): freeze prompts, agent settings and tool specs (ledger `prompt_freeze`); required before any TEST-split run; refuses without `--confirm` |
+| `scenario-keys\|generate\|build\|verify SCENARIO_ID ... --seed S` | seed cases `credtheft_lateral_v4_s<S>_<variant>` (DEV 201-203, TEST 301-305; see `docs/evaluation_protocol.md`) |
 | `agent-peek RUN_ID` | EVAL ONLY, PRELIMINARY: do the run's findings touch the key's planted truth? (mechanics check, not the Phase 9 evaluation) |
 
 Datasets live in `data/downloads/` (gitignored); see `docs/scenarios.md`. The current scenario is

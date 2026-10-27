@@ -12,12 +12,13 @@ from contextlib import closing
 from dataclasses import dataclass, field
 
 from chainofproof.agents import store
-from chainofproof.config import Paths
+from chainofproof.config import Paths, load_settings
 from chainofproof.custody.db import connect
 from chainofproof.eval.detector_eval import index_resolvers, match_hits
 from chainofproof.eval.gt_link import EvalIndex, build_index, resolve_ref
+from chainofproof.protocol.guard import check_run_allowed
 from chainofproof.scenarios.dataset import scenario_dir
-from chainofproof.scenarios.source_map import load_case_scenario
+from chainofproof.scenarios.source_map import case_key_path, load_case_scenario
 from chainofproof.schemas.adjudication import Verdict, load_adjudication
 from chainofproof.schemas.findings import Finding
 from chainofproof.schemas.scenario import load_key
@@ -73,6 +74,7 @@ def peek(paths: Paths, run_id: str) -> PeekReport:
     """Compare one run's findings with the answer key of its case."""
     row = store.get_run(paths, run_id)
     case = row["case_id"]
+    check_run_allowed(paths, case, load_settings().agent)  # TEST runs: only under a freeze
     scope = store.root_run(paths, run_id)
     findings = store.list_findings(paths, run_id)
     rep = PeekReport(run_id, case)
@@ -86,7 +88,7 @@ def peek(paths: Paths, run_id: str) -> PeekReport:
             rep.detectors[name.removeprefix("detect_")] += 1
     scn, variant = load_case_scenario(case)
     d = scenario_dir(scn.scenario_id)
-    key = load_key(d / f"key_{variant.value}.yaml", scn)
+    key = load_key(case_key_path(case), scn)
     adj = load_adjudication(d / "adjudication.yaml")
     idx = build_index(paths, case)
     for a in key.actions:

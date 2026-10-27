@@ -30,9 +30,19 @@ def scenario_dir(scenario_id: str) -> Path:
     return scenarios_root() / scenario_id
 
 
-def generated_dir(paths: Paths, scenario_id: str, variant: str) -> Path:
-    """Where generated (SYNTHETIC) companion files of a variant are written (gitignored)."""
-    return paths.base_dir / "scenarios_generated" / scenario_id / variant
+def generated_dir(paths: Paths, scenario_id: str, variant: str, seed: int | None = None) -> Path:
+    """Where generated (SYNTHETIC) companion files of a variant are written (gitignored).
+
+    A seed run goes to ``<scenario>/seed_<S>/<variant>``; the base seed keeps its old place.
+    """
+    root = paths.base_dir / "scenarios_generated" / scenario_id
+    return root / variant if seed is None else root / f"seed_{seed}" / variant
+
+
+def key_file(scenario_id: str, variant: str, seed: int | None = None) -> Path:
+    """Answer-key file of a variant; seed keys live in ``<scenario>/seeds/<S>/`` (committed)."""
+    base = scenario_dir(scenario_id)
+    return (base if seed is None else base / "seeds" / str(seed)) / f"key_{variant}.yaml"
 
 
 def git_commit(repo: Path) -> str | None:

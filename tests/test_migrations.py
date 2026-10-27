@@ -7,6 +7,7 @@ from chainofproof.custody.migrations import (
     migrate_to_v2,
     migrate_to_v3,
     migrate_to_v4,
+    migrate_to_v5,
     schema_version,
 )
 from chainofproof.ingest.store import SCHEMA, EvidenceStore
@@ -101,11 +102,49 @@ def test_v1_passes_through_v2_to_v3(paths):
 def test_fresh_database_is_created_at_latest_version_and_not_migrated(paths):
     EvidenceStore(paths)
     with closing(sqlite3.connect(paths.db_path)) as con:
-        assert schema_version(con) == 4
+        assert schema_version(con) == 5
+        cols = {r[1] for r in con.execute("PRAGMA table_info(agent_runs)")}
+    assert {"arg_errors", "format_errors", "duplicate_refusals", "split"} <= cols
     assert (V3_TABLES | V4_TABLES) <= tables(paths)
-    m = migrate_to_v4(paths)
+    m = migrate_to_v5(paths)
     assert not migrate_to_v2(paths).migrated and not migrate_to_v3(paths).migrated
+    assert not migrate_to_v4(paths).migrated
     assert not m.migrated and not (paths.db_dir / "backups").exists()
+
+
+def test_v4_to_v5_keeps_agent_runs_gives_defaults_and_is_idempotent(paths):
+    make_v1(paths)
+    migrate_to_v4(paths)
+    with closing(sqlite3.connect(paths.db_path)) as con:
+        con.execute(
+            "INSERT INTO agent_runs(run_id, case_id, model, num_ctx, seed, settings_json, "
+            "settings_sha256, prompt_version, input_sha256, started_at, status) VALUES "
+            "('RUN-000001','C1','m',8192,42,'{}','s','p','i','2024-01-01','completed')"
+        )
+        con.commit()
+    n = len(Ledger(paths).read_all())
+    m = migrate_to_v5(paths)
+    assert m.migrated and (m.from_version, m.to_version) == (4, 5)
+    assert m.backup_name == "chainofproof.db.pre-v5"
+    assert sha256_file(paths.db_dir / "backups" / m.backup_name) == m.backup_sha256
+    with closing(sqlite3.connect(paths.db_path)) as con:
+        assert schema_version(con) == 5
+        row = con.execute(
+            "SELECT run_id, status, arg_errors, format_errors, duplicate_refusals, split "
+            "FROM agent_runs"
+        ).fetchall()
+        assert row == [("RUN-000001", "completed", 0, 0, 0, None)]
+    last = Ledger(paths).read_all()[-1]
+    assert last.action == "db_migrate" and last.details["to_version"] == 5
+    assert not migrate_to_v5(paths).migrated and len(Ledger(paths).read_all()) == n + 1
+    assert Ledger(paths).verify().ok
+
+
+def test_v1_passes_through_every_step_to_v5(paths):
+    make_v1(paths)
+    assert migrate_to_v5(paths).to_version == 5
+    names = sorted(p.name for p in (paths.db_dir / "backups").iterdir())
+    assert names == [f"chainofproof.db.pre-v{i}" for i in (2, 3, 4, 5)]
 
 
 V4_TABLES = {"agent_runs", "agent_calls", "findings"}

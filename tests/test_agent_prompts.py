@@ -24,6 +24,7 @@ from chainofproof.config import AgentSettings, load_settings
 from chainofproof.llm.fake import FakeLLMClient
 from chainofproof.schemas import agent as agent_schemas
 from chainofproof.schemas import findings as findings_schemas
+from chainofproof.tools.describe import tool_signature_lines
 from chainofproof.tools.registry import ROLES
 from evfactory import ev
 
@@ -51,7 +52,8 @@ def forbidden_in(text: str) -> list[str]:
 def test_templates_and_tool_listings_contain_no_scenario_terms():
     texts = [json.dumps(prompts.TEMPLATES), prompts.planner_system()]
     texts += [prompts.worker_system(r) for r in ("extractor", "correlator")]
-    texts += [prompts.tools_text(r) for r in ROLES]
+    texts += [prompts.tools_section(r) for r in prompts.WORKER_ROLES]
+    texts += [prompts.workers_section(), *(x for r in ROLES for x in tool_signature_lines(r))]
     for t in texts:
         assert forbidden_in(t) == []
 
@@ -70,7 +72,7 @@ def test_prompt_version_is_a_stable_hash_that_changes_with_any_template(monkeypa
 def test_system_prompts_are_short_enough_for_an_8k_context():
     from chainofproof.llm.budget import estimate_tokens
 
-    assert estimate_tokens(prompts.planner_system()) < 1000
+    assert estimate_tokens(prompts.planner_system()) < 1300
     assert all(
         estimate_tokens(prompts.worker_system(r)) < 1800 for r in ("extractor", "correlator")
     )

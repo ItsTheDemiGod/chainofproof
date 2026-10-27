@@ -40,6 +40,7 @@ Agents may all use the same local model with different prompts and different too
 - Phase 4: Evidence graph and contradiction detectors [DONE]
 - Phase 4.1: Generator realism rebuild, scenario v4 [DONE]
 - Phase 5: Agent core [DONE] (LLM client, planner loop, workers, findings, citation verifier, replay)
+- Phase 5.1: Agent interface fixes and dev/test split [DONE]
 - Phase 6: Skeptic, calibration, missing-evidence reasoning [TODO]
 - Phase 7: Prompt-injection defense [TODO]
 - Phase 8: Reporter, MITRE mapping, Streamlit UI [TODO]
@@ -65,6 +66,11 @@ Agents may all use the same local model with different prompts and different too
 - A5: every LLM call and every tool call of an agent run is recorded in the ledger (hashes, never contents).
 - A6: the citation verifier is deterministic plain code; no LLM in the verifier.
 - A7: agent DB access goes through a restricted connection whose SQLite authorizer denies `event_eval_meta` and any eval table.
+
+## Evaluation protocol (Phase 5.1, enforced in code; see docs/evaluation_protocol.md)
+- E1: cases are split into DEV and TEST (`scenarios/credtheft_lateral_v4/splits.yaml`). DEV cases may be used to judge prompt and tool fixes on MECHANICAL metrics only (tool-error rate, JSON validity after retries, citation-format validity, run completion), never on whether the agent found the attack. TEST cases are NEVER run by any agent until the human has frozen prompts and parameters with `agent-freeze`; `run_agent` itself refuses otherwise.
+- E2: after the first agent run on a TEST case, any change to prompts, agent parameters or tools used by agents invalidates the freeze (new freeze + a statement in the write-up). Every prompt or parameter change after the first real DEV run needs an entry in `docs/prompt_changelog.md` with the observed MECHANICAL problem.
+- E3: Claude Code must NOT run `agent-run` on a TEST-split case, must NOT execute `agent-freeze`, and must not read, print or summarise any agent output for TEST cases. `agent-peek` output must not be used to change prompts, parameters or tools in the same phase.
 
 ## Synthetic realism (Phase 4.1)
 - Synthetic benign data must share the vocabulary of attacker-related synthetic lines; key-referenced lines must not be separable by superficial features; residual unavoidable tells are documented in docs/style_audit.md.

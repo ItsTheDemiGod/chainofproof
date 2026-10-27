@@ -1,0 +1,10 @@
+# DEV / TEST split of the credtheft_lateral_v4 cases (Phase 5.1, rules E1 to E3).
+# DEV cases may be used to judge prompt/tool fixes on MECHANICAL metrics only.
+# TEST cases are never run by an agent until a matching prompt_freeze ledger entry exists.
+# Seed cases are named credtheft_lateral_v4_s<seed>_<variant>; the base cases have no seed.
+scenario_id: credtheft_lateral_v4
+dev:
+  base: true
+  seeds: [201, 202, 203]
+test:
+  seeds: [301, 302, 303, 304, 305]

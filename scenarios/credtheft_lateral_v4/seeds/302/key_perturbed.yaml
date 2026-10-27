@@ -1,0 +1,666 @@
+scenario_id: credtheft_lateral_v4
+variant: perturbed
+seed: 302
+actions:
+- id: GT-ACT-001
+  stage_id: S1
+  description: A Mimikatz binary reads LSASS memory (Sysmon 10). The SYNTHETIC credential-dump output
+    file (synthetic_only) deliberately has an innocuous, document-like name and location.
+  attack_technique_id: T1003.001
+  virtual_host: WS-FIN-07
+  account: null
+  real_time: '2019-03-17T19:37:11.661928Z'
+  virtual_time: '2024-03-12T09:03:17.661928Z'
+  supporting_refs:
+  - source_key: s1_lsass_mimikatz
+    event_record_id: 4807
+    event_id: 10
+    pairing_field: null
+    pairing_value: null
+    paired_source_key: null
+    paired_record_ids: []
+    synthetic_only: false
+  - source_key: fs_ws_fin_07
+    event_record_id: 111
+    event_id: null
+    pairing_field: image_basename
+    pairing_value: mimikatz.exe
+    paired_source_key: s1_lsass_mimikatz
+    paired_record_ids:
+    - 4807
+    synthetic_only: false
+  - source_key: fs_ws_fin_07
+    event_record_id: 122
+    event_id: null
+    pairing_field: null
+    pairing_value: null
+    paired_source_key: null
+    paired_record_ids: []
+    synthetic_only: true
+  confidence: high
+  rationale: EventID 10, TargetImage=lsass.exe, GrantedAccess, SourceImage.
+- id: GT-ACT-002
+  stage_id: S2
+  description: Use of stolen credential (pass-the-hash) (T1550.002).
+  attack_technique_id: T1550.002
+  virtual_host: WS-FIN-07
+  account: user01
+  real_time: '2019-03-18T11:06:29.911579Z'
+  virtual_time: '2024-03-12T09:27:41.911579Z'
+  supporting_refs:
+  - source_key: s2_pth_logon
+    event_record_id: 432903
+    event_id: 4624
+    pairing_field: null
+    pairing_value: null
+    paired_source_key: null
+    paired_record_ids: []
+    synthetic_only: false
+  - source_key: s2_pth_logon
+    event_record_id: 432904
+    event_id: 4672
+    pairing_field: null
+    pairing_value: null
+    paired_source_key: null
+    paired_record_ids: []
+    synthetic_only: false
+  - source_key: auth_ws_fin_07
+    event_record_id: 73
+    event_id: null
+    pairing_field: logon_id
+    pairing_value: '0x0000000004530f0f'
+    paired_source_key: s2_pth_logon
+    paired_record_ids:
+    - 432903
+    - 432904
+    synthetic_only: false
+  confidence: medium
+  rationale: 'EventID 4624, LogonType 9 + LogonProcessName seclogo, TargetUserName; EventID 4672, SubjectLogonId
+    equals the 4624 TargetLogonId. Caveat: LogonType 9 ''seclogo'' is also produced by legitimate runas
+    /netonly, so the logon alone does not prove a stolen hash; hence medium.'
+- id: GT-ACT-003
+  stage_id: S3
+  description: 'Remote service control reached the target over SMB: ntsvcs pipe opened by the System process
+    and an inbound TCP 445 connection. No network logon and no ADMIN$ copy are present in the real file.'
+  attack_technique_id: T1021.002
+  virtual_host: SRV-FILE-02
+  account: null
+  real_time: '2019-04-30T20:26:51.793589Z'
+  virtual_time: '2024-03-12T09:42:09.793589Z'
+  supporting_refs:
+  - source_key: s3_psexec_smb
+    event_record_id: 9804
+    event_id: 18
+    pairing_field: null
+    pairing_value: null
+    paired_source_key: null
+    paired_record_ids: []
+    synthetic_only: false
+  - source_key: s3_psexec_smb
+    event_record_id: 9811
+    event_id: 3
+    pairing_field: null
+    pairing_value: null
+    paired_source_key: null
+    paired_record_ids: []
+    synthetic_only: false
+  confidence: medium
+  rationale: 'EventID 18, PipeName=ntsvcs opened by the System process (SMB server side); EventID 3, Image=System,
+    Initiated=False, SourcePort=445 (inbound SMB). Caveat: no network logon (4624/5140) and no ADMIN$
+    file copy in this file: the SMB link rests on the System-process ntsvcs pipe open and the inbound
+    TCP 445 connection; who connected and with which credential is not shown.'
+- id: GT-ACT-004
+  stage_id: S3
+  description: A new service key is written by services.exe and its command line runs a hidden PowerShell
+    chain (cmd.exe then powershell.exe). PsExec itself is not visible.
+  attack_technique_id: T1569.002
+  virtual_host: SRV-FILE-02
+  account: NT AUTHORITY\SYSTEM
+  real_time: '2019-04-30T20:26:51.949839Z'
+  virtual_time: '2024-03-12T09:42:09.949839Z'
+  supporting_refs:
+  - source_key: s3_psexec_smb
+    event_record_id: 9805
+    event_id: 13
+    pairing_field: null
+    pairing_value: null
+    paired_source_key: null
+    paired_record_ids: []
+    synthetic_only: false
+  - source_key: s3_psexec_smb
+    event_record_id: 9806
+    event_id: 13
+    pairing_field: null
+    pairing_value: null
+    paired_source_key: null
+    paired_record_ids: []
+    synthetic_only: false
+  - source_key: s3_psexec_smb
+    event_record_id: 9807
+    event_id: 1
+    pairing_field: null
+    pairing_value: null
+    paired_source_key: null
+    paired_record_ids: []
+    synthetic_only: false
+  - source_key: s3_psexec_smb
+    event_record_id: 9808
+    event_id: 1
+    pairing_field: null
+    pairing_value: null
+    paired_source_key: null
+    paired_record_ids: []
+    synthetic_only: false
+  - source_key: s3_psexec_smb
+    event_record_id: 9809
+    event_id: 1
+    pairing_field: null
+    pairing_value: null
+    paired_source_key: null
+    paired_record_ids: []
+    synthetic_only: false
+  - source_key: fs_srv_file_02
+    event_record_id: 246
+    event_id: null
+    pairing_field: image_basename
+    pairing_value: powershell.exe
+    paired_source_key: s3_psexec_smb
+    paired_record_ids:
+    - 9808
+    - 9809
+    synthetic_only: false
+  confidence: medium
+  rationale: 'EventID 13, TargetObject under \services\ written by services.exe; EventID 1, shell/PowerShell
+    process chain started by the new service. Caveat: the service runs a command line (cmd.exe -> powershell.exe),
+    not PsExec itself; no PsExec artifact is visible in this file.'
+- id: GT-ACT-005
+  stage_id: S4
+  description: A svchost.exe image outside System32 creates named pipes (renamed service binary).
+  attack_technique_id: T1036.003
+  virtual_host: SRV-FILE-02
+  account: null
+  real_time: '2020-09-27T13:42:00.726774Z'
+  virtual_time: '2024-03-12T09:57:33.726774Z'
+  supporting_refs:
+  - source_key: s4_renamed_psexec
+    event_record_id: 409645
+    event_id: 17
+    pairing_field: null
+    pairing_value: null
+    paired_source_key: null
+    paired_record_ids: []
+    synthetic_only: false
+  - source_key: fs_srv_file_02
+    event_record_id: 276
+    event_id: null
+    pairing_field: image_basename
+    pairing_value: svchost.exe
+    paired_source_key: s4_renamed_psexec
+    paired_record_ids:
+    - 409645
+    synthetic_only: false
+  confidence: medium
+  rationale: 'EventID 17, Image=svchost.exe outside \Windows\System32 (name/path mismatch). Caveat: the
+    rename is inferred from the image path; no file hash or PE name.'
+- id: GT-ACT-006
+  stage_id: S4
+  description: PsExec.exe connects the stdin/stdout/stderr pipes of the renamed service; the pipe naming
+    scheme is PsExec's.
+  attack_technique_id: T1569.002
+  virtual_host: SRV-FILE-02
+  account: null
+  real_time: '2020-09-27T13:42:01.092665Z'
+  virtual_time: '2024-03-12T09:57:34.092665Z'
+  supporting_refs:
+  - source_key: s4_renamed_psexec
+    event_record_id: 409647
+    event_id: 17
+    pairing_field: null
+    pairing_value: null
+    paired_source_key: null
+    paired_record_ids: []
+    synthetic_only: false
+  - source_key: s4_renamed_psexec
+    event_record_id: 409648
+    event_id: 17
+    pairing_field: null
+    pairing_value: null
+    paired_source_key: null
+    paired_record_ids: []
+    synthetic_only: false
+  - source_key: s4_renamed_psexec
+    event_record_id: 409649
+    event_id: 17
+    pairing_field: null
+    pairing_value: null
+    paired_source_key: null
+    paired_record_ids: []
+    synthetic_only: false
+  - source_key: s4_renamed_psexec
+    event_record_id: 409650
+    event_id: 18
+    pairing_field: null
+    pairing_value: null
+    paired_source_key: null
+    paired_record_ids: []
+    synthetic_only: false
+  - source_key: s4_renamed_psexec
+    event_record_id: 409651
+    event_id: 18
+    pairing_field: null
+    pairing_value: null
+    paired_source_key: null
+    paired_record_ids: []
+    synthetic_only: false
+  - source_key: s4_renamed_psexec
+    event_record_id: 409652
+    event_id: 18
+    pairing_field: null
+    pairing_value: null
+    paired_source_key: null
+    paired_record_ids: []
+    synthetic_only: false
+  - source_key: fs_srv_file_02
+    event_record_id: 338
+    event_id: null
+    pairing_field: image_basename
+    pairing_value: psexec.exe
+    paired_source_key: s4_renamed_psexec
+    paired_record_ids:
+    - 409650
+    - 409651
+    - 409652
+    synthetic_only: false
+  - source_key: auth_srv_file_02
+    event_record_id: 113
+    event_id: null
+    pairing_field: pipe_name
+    pairing_value: svchost-MSEDGEWIN10-8116-stdin
+    paired_source_key: s4_renamed_psexec
+    paired_record_ids:
+    - 409650
+    synthetic_only: false
+  - source_key: auth_srv_file_02
+    event_record_id: 114
+    event_id: null
+    pairing_field: pipe_name
+    pairing_value: svchost-MSEDGEWIN10-8116-stdout
+    paired_source_key: s4_renamed_psexec
+    paired_record_ids:
+    - 409651
+    synthetic_only: false
+  - source_key: auth_srv_file_02
+    event_record_id: 112
+    event_id: null
+    pairing_field: pipe_name
+    pairing_value: svchost-MSEDGEWIN10-8116-stderr
+    paired_source_key: s4_renamed_psexec
+    paired_record_ids:
+    - 409652
+    synthetic_only: false
+  confidence: high
+  rationale: 'EventID 17, PipeName matches <name>-<host>-<pid>-stdin/out/err; EventID 18, Image=PsExec.exe
+    connects the PsExec-style pipe. Caveat: the rename is inferred from the image path; no file hash or
+    PE name.'
+- id: GT-ACT-007
+  stage_id: S5
+  description: Domain credential dump (T1003.006).
+  attack_technique_id: T1003.006
+  virtual_host: DC-01
+  account: Administrator
+  real_time: '2019-05-08T02:10:43.487217Z'
+  virtual_time: '2024-03-12T10:36:52.487217Z'
+  supporting_refs:
+  - source_key: s5_dcsync
+    event_record_id: 202791
+    event_id: 4662
+    pairing_field: null
+    pairing_value: null
+    paired_source_key: null
+    paired_record_ids: []
+    synthetic_only: false
+  - source_key: s5_dcsync
+    event_record_id: 202792
+    event_id: 4662
+    pairing_field: null
+    pairing_value: null
+    paired_source_key: null
+    paired_record_ids: []
+    synthetic_only: false
+  - source_key: s5_dcsync
+    event_record_id: 202793
+    event_id: 4662
+    pairing_field: null
+    pairing_value: null
+    paired_source_key: null
+    paired_record_ids: []
+    synthetic_only: false
+  confidence: high
+  rationale: 'EventID 4662, Properties contains a replication-rights GUID, SubjectUserName. Caveat: subject
+    is a user account (not a DC machine account); source host of the request is not in this file.'
+- id: GT-ACT-008
+  stage_id: S2
+  description: Security audit log cleared (EventID 1102) about 4.4 s before the new-credentials logon
+    on the same host.
+  attack_technique_id: T1070.001
+  virtual_host: WS-FIN-07
+  account: user01
+  real_time: '2019-03-18T11:06:25.485214Z'
+  virtual_time: '2024-03-12T09:27:37.485214Z'
+  supporting_refs:
+  - source_key: s2_pth_logon
+    event_record_id: 432901
+    event_id: 1102
+    pairing_field: null
+    pairing_value: null
+    paired_source_key: null
+    paired_record_ids: []
+    synthetic_only: false
+  confidence: medium
+  rationale: 'EventID 1102 (Security audit log cleared) shortly before the 4624. Caveat: the clear may
+    instead be lab preparation by the dataset author before recording; it is treated as a defense-evasion
+    indicator inside this constructed storyline.'
+contradictions:
+- id: GT-CON-001
+  kind: timestomp
+  sources_involved:
+  - fs_srv_file_02
+  - s4_renamed_psexec
+  description: Two attacker-dropped binaries on SRV-FILE-02 (the renamed service binary and the PsExec
+    client) have $STANDARD_INFORMATION created/modified times set to 2021-06-15 while $FILE_NAME times
+    keep the true drop time.
+  magnitude: 2.0
+  magnitude_unit: count
+  params:
+    host: SRV-FILE-02
+    files:
+    - source_key: fs_srv_file_02
+      record_id: 276
+      path: C:\Windows\svchost.exe
+      si_created: '2021-06-15T11:58:59Z'
+      fn_created: '2024-03-12T09:57:30Z'
+      delta_seconds: 86479111
+      pairing_field: image_basename
+      pairing_value: svchost.exe
+    - source_key: fs_srv_file_02
+      record_id: 338
+      path: C:\Windows\system32\PsExec.exe
+      si_created: '2021-06-15T17:38:03Z'
+      fn_created: '2024-03-12T09:57:21Z'
+      delta_seconds: 86458758
+      pairing_field: image_basename
+      pairing_value: psexec.exe
+  detectable_by: 'si_created differs from fn_created by more than a day within the SAME file-system record.
+    This is the only check that works: no real event records the creation of these files, so there is
+    no cross-source creation-time comparison.'
+  checks:
+  - si_fn_mismatch
+  expected_collateral_conn_ids: []
+- id: GT-CON-002
+  kind: clock_skew
+  sources_involved:
+  - auth_srv_file_02
+  - s4_renamed_psexec
+  description: Every auth-log line of SRV-FILE-02 (340 lines, benign background and the synthetic cross-host
+    link lines included) is 420 s later than reality.
+  magnitude: 420.0
+  magnitude_unit: seconds
+  params:
+    host: SRV-FILE-02
+    source_key: auth_srv_file_02
+    shift_seconds: 420
+    lines_shifted: 340
+    paired_lines:
+    - seq: 112
+      pairing_field: pipe_name
+      pairing_value: svchost-MSEDGEWIN10-8116-stderr
+      real_source_key: s4_renamed_psexec
+      real_record_ids:
+      - 409652
+      aligned_real_time: '2024-03-12T09:57:34Z'
+      clean_delta_seconds: 0
+      perturbed_delta_seconds: 420
+    - seq: 113
+      pairing_field: pipe_name
+      pairing_value: svchost-MSEDGEWIN10-8116-stdin
+      real_source_key: s4_renamed_psexec
+      real_record_ids:
+      - 409650
+      aligned_real_time: '2024-03-12T09:57:34Z'
+      clean_delta_seconds: 0
+      perturbed_delta_seconds: 420
+    - seq: 114
+      pairing_field: pipe_name
+      pairing_value: svchost-MSEDGEWIN10-8116-stdout
+      real_source_key: s4_renamed_psexec
+      real_record_ids:
+      - 409651
+      aligned_real_time: '2024-03-12T09:57:34Z'
+      clean_delta_seconds: 0
+      perturbed_delta_seconds: 420
+    cross_host_pairs:
+    - conn_id: CONN-0034
+      source_side:
+        source_key: auth_ws_fin_07
+        seq: 83
+      dest_side:
+        source_key: auth_srv_file_02
+        seq: 90
+      clean_delta_seconds: 0
+      perturbed_delta_seconds: 420
+  detectable_by: 'paired lines: each NAMED_PIPE_OPEN line carries pair=pipe_name:<name>, the pipe name
+    of a real S4 Sysmon 18 event; after the alignment layer the line time minus the real event time (whole
+    seconds) is 0 s in the clean variant and +420 s in the perturbed variant for every paired line. cross_host_pair_delta:
+    the two ends of CONN-0034 (WS-FIN-07 CONN_OUT, SRV-FILE-02 LOGON_SUCCESS, same conn_id) differ by
+    exactly 0 s in the clean variant and +420 s in the perturbed variant; every benign connection with
+    one end on SRV-FILE-02 is shifted the same way (+420 s when SRV-FILE-02 holds the destination end,
+    -420 s when it holds the source end); this compares SYNTHETIC with SYNTHETIC lines, no real event
+    is involved'
+  checks:
+  - paired_line_time_delta
+  - cross_host_pair_delta
+  expected_collateral_conn_ids: []
+- id: GT-CON-003
+  kind: log_gap
+  sources_involved:
+  - auth_dc_01
+  - s5_dcsync
+  description: All 22 DC-01 auth-log lines in a 12-minute window containing the DCSync event are missing
+    (seq 217 to 238), among them the destination-side line of the synthetic connection CONN-0054 and the
+    DC-01 end of 2 benign connections; seq jumps over the window.
+  magnitude: 720.0
+  magnitude_unit: seconds
+  params:
+    host: DC-01
+    source_key: auth_dc_01
+    window_start: '2024-03-12T10:31:17Z'
+    window_end: '2024-03-12T10:43:17Z'
+    removed_lines: 22
+    first_removed_seq: 217
+    last_removed_seq: 238
+    real_source_key: s5_dcsync
+    real_record_ids_inside_window:
+    - 202791
+    - 202792
+    - 202793
+    unmatched_connections:
+    - conn_id: CONN-0054
+      present_side: source
+      present:
+        source_key: auth_srv_file_02
+        seq: 152
+      missing:
+        source_key: auth_dc_01
+        seq: 227
+  detectable_by: 'seq discontinuity in the DC-01 auth log, plus real S5 4662 events (record ids in real_record_ids_inside_window)
+    whose aligned time falls inside the missing window. unmatched_connection: the SRV-FILE-02 source-side
+    line of CONN-0054 has no destination-side counterpart on DC-01 (removed in the window); in the clean
+    variant every conn_id has both ends. The removal also breaks benign connections: every conn_id in
+    expected_collateral_conn_ids loses its DC-01 end and shows up as unmatched too (expected collateral
+    of the gap, not a separate contradiction)'
+  checks:
+  - seq_discontinuity
+  - real_events_inside_gap
+  - unmatched_connection
+  expected_collateral_conn_ids:
+  - CONN-0053
+  - CONN-0055
+decoys:
+- id: GT-DEC-001
+  source_key: d1_winlogon_persist
+  why_out_of_scope: 'Winlogon Shell persistence on WS-HR-03: a separate incident with no shared account,
+    host, tool or time window with the storyline. Linking it to the storyline is a false attribution.'
+- id: GT-DEC-002
+  source_key: d2_rundll32_lolbin
+  why_out_of_scope: 'rundll32 advpack proxy execution on SRV-WEB-01: unrelated technique and host, no
+    link to the credential-theft chain. Linking it to the storyline is a false attribution.'
+injections: []
+missing_evidence:
+- id: GT-MIS-001
+  description: No network packet capture is available, so the SMB data movement and the content of the
+    PsExec/replication traffic cannot be inspected.
+  confirms_claim: 'S3/S5: that remote service creation and replication crossed the network from WS-FIN-07'
+- id: GT-MIS-002
+  description: 'No endpoint logs exist for the attacker''s initial access (how the first foothold on WS-FIN-07
+    was obtained: phishing, exploit, valid account).'
+  confirms_claim: The initial-access stage and the origin of the attack
+- id: GT-MIS-003
+  description: No memory image of WS-FIN-07 or DC-01 is available.
+  confirms_claim: 'S1/S5: that credentials were actually extracted and which accounts were exposed'
+- id: GT-MIS-004
+  description: 'Real network-authentication evidence is still absent: no Security 4624 type 3 / 5140 /
+    5145 and no ADMIN$ file copy exist for the remote service creation on SRV-FILE-02, and the real S5
+    4662 events show no source address. The real S3 file shows only the ntsvcs pipe, an inbound TCP 445
+    connection and the service/PowerShell activity. The SYNTHETIC synth_only cross-host lines (CONN-0034,
+    CONN-0054) stand in for this evidence; they are not proof that it exists in the real captures.'
+  confirms_claim: 'S3/S5: which account authenticated, from which host, and that an admin share was used'
+generated_file_hashes:
+  auth_dc_01.log: beeb980d1a5b1d176cd7f2b391d9b8a516b3b94804f228aa4e002cd1039af93f
+  auth_srv_file_02.log: 90276d84d41bd2cb90180caaa0e508602c7d6667881cefe976edb669bc31fb96
+  auth_ws_fin_07.log: 32688ebe22c6273799f5cf2585dbdb4a0891925f8c45b3579c3481330028c503
+  fs_dc_01.csv: adfad57e2da1bfa4e2483c80ca99061877bab67a60cf10a08c0b5dc498904d11
+  fs_srv_file_02.csv: 940653b21a18df9607cd7a0bacc03ca10e141ca01e5415c334a0909901338ec0
+  fs_ws_fin_07.csv: 084c48396d1e6ca4695a398a40e51c7b864141934320d5be77fb34b1c249f025
+links:
+- id: GT-LNK-001
+  from_host: WS-FIN-07
+  to_host: WS-FIN-07
+  kind: stage_continuation
+  basis: alignment_constructed
+  from_stage: S1
+  to_stage: S2
+  evidence_refs:
+  - source_key: s1_lsass_mimikatz
+    event_record_id: 4807
+    event_id: 10
+    pairing_field: null
+    pairing_value: null
+    paired_source_key: null
+    paired_record_ids: []
+    synthetic_only: false
+    conn_id: null
+  - source_key: s2_pth_logon
+    event_record_id: 432903
+    event_id: 4624
+    pairing_field: null
+    pairing_value: null
+    paired_source_key: null
+    paired_record_ids: []
+    synthetic_only: false
+    conn_id: null
+  real_evidence_note: S1 shows a process reading lsass.exe memory (Sysmon 10) but no account. S2 shows
+    a type 9 (new credentials) logon of user01 (Security 4624). Neither file refers to the other; the
+    connection between them is by time and host mapping only (the alignment layer maps both captures to
+    WS-FIN-07, S2 after S1).
+  expected_agent_statement: The LSASS read and the later new-credentials logon of user01 on WS-FIN-07
+    are plausibly one sequence, but only the host and time mapping links them; no record shows the logon
+    used the stolen secret.
+- id: GT-LNK-002
+  from_host: WS-FIN-07
+  to_host: SRV-FILE-02
+  kind: lateral_movement
+  basis: synthetic_only
+  from_stage: S2
+  to_stage: S3
+  evidence_refs:
+  - source_key: auth_ws_fin_07
+    event_record_id: 83
+    event_id: null
+    pairing_field: null
+    pairing_value: null
+    paired_source_key: null
+    paired_record_ids: []
+    synthetic_only: true
+    conn_id: CONN-0034
+  - source_key: auth_srv_file_02
+    event_record_id: 90
+    event_id: null
+    pairing_field: null
+    pairing_value: null
+    paired_source_key: null
+    paired_record_ids: []
+    synthetic_only: true
+    conn_id: CONN-0034
+  real_evidence_note: The real S3 file shows only an inbound TCP 445 connection (Sysmon 3) and the ntsvcs
+    pipe on SRV-FILE-02; it does not show which account connected or from which host. The real S2 file
+    shows the user01 logon on WS-FIN-07 only, a local logon. The only evidence of a connection from WS-FIN-07
+    to SRV-FILE-02 is the pair of SYNTHETIC synth_only lines with conn_id CONN-0034.
+  expected_agent_statement: A SYNTHETIC SMB connection (CONN-0034) and type 3 logon of user01 from WS-FIN-07
+    to SRV-FILE-02 is the only evidence of the hop; the real S3 file does not show the account or the
+    source host.
+- id: GT-LNK-003
+  from_host: SRV-FILE-02
+  to_host: SRV-FILE-02
+  kind: stage_continuation
+  basis: alignment_constructed
+  from_stage: S3
+  to_stage: S4
+  evidence_refs:
+  - source_key: s3_psexec_smb
+    event_record_id: 9804
+    event_id: 18
+    pairing_field: null
+    pairing_value: null
+    paired_source_key: null
+    paired_record_ids: []
+    synthetic_only: false
+    conn_id: null
+  - source_key: s4_renamed_psexec
+    event_record_id: 409645
+    event_id: 17
+    pairing_field: null
+    pairing_value: null
+    paired_source_key: null
+    paired_record_ids: []
+    synthetic_only: false
+    conn_id: null
+  real_evidence_note: S3 shows a new service launching a hidden PowerShell chain. S4 shows a svchost.exe
+    outside System32 creating PsExec-style named pipes. The two captures share no process, logon, pipe
+    or account; the alignment layer maps both to SRV-FILE-02 (S4 after S3), so continuity rests on host
+    and time mapping.
+  expected_agent_statement: The service-launched PowerShell (S3) and the renamed PsExec service pipes
+    (S4) on SRV-FILE-02 may belong to one intrusion, but only the host and time mapping connects them.
+- id: GT-LNK-004
+  from_host: SRV-FILE-02
+  to_host: DC-01
+  kind: remote_replication
+  basis: synthetic_only
+  from_stage: S4
+  to_stage: S5
+  evidence_refs:
+  - source_key: auth_srv_file_02
+    event_record_id: 152
+    event_id: null
+    pairing_field: null
+    pairing_value: null
+    paired_source_key: null
+    paired_record_ids: []
+    synthetic_only: true
+    conn_id: CONN-0054
+  real_evidence_note: The real S5 file shows Security 4662 directory-replication access on the domain
+    controller with an account and logon id but no source address or connection record; the real S4 file
+    is local to SRV-FILE-02. Nothing real shows that SRV-FILE-02 made the replication request. The connection
+    is shown only by SYNTHETIC synth_only lines with conn_id CONN-0054. In this variant the destination-side
+    line was removed by the DC-01 log gap (GT-CON-003).
+  expected_agent_statement: Only SYNTHETIC lines (CONN-0054) place the replication request on SRV-FILE-02;
+    the real DCSync events do not show where the request came from.

@@ -18,6 +18,7 @@ from chainofproof.schemas.scenario import AnswerKey, ScenarioError, Variant, loa
 
 VariantArg = Annotated[Variant, typer.Argument(help="clean or perturbed")]
 Force = Annotated[bool, typer.Option("--force", help="Overwrite existing outputs")]
+SeedOpt = Annotated[int | None, typer.Option("--seed", help="Seed case (default: base seed)")]
 
 
 def inventory_tables(inv: Inventory) -> list[Table]:
@@ -112,18 +113,19 @@ def register(app: typer.Typer, handled: Callable[..., Any], out: Console, err: C
 
     @app.command("scenario-keys")
     @handled
-    def scenario_keys(scenario_id: str) -> None:
-        """(Re)write key_clean.yaml and key_perturbed.yaml from the inventory and generator."""
-        for p in build.write_keys(scenario_id):
-            out.print(f"wrote {p.name}")
+    def scenario_keys(scenario_id: str, seed: SeedOpt = None) -> None:
+        """(Re)write key_clean.yaml and key_perturbed.yaml (--seed: scenarios/<id>/seeds/<S>/)."""
+        for p in build.write_keys(scenario_id, seed):
+            out.print(f"wrote {p.parent.name}/{p.name}" if seed else f"wrote {p.name}")
 
     @app.command("scenario-generate")
     @handled
     def scenario_generate(
-        ctx: typer.Context, scenario_id: str, variant: VariantArg, force: Force = False
-    ) -> None:
+        ctx: typer.Context, scenario_id: str, variant: VariantArg, force: Force = False,
+        seed: SeedOpt = None,
+    ) -> None:  # fmt: skip
         """Generate the SYNTHETIC companion files of one variant."""
-        folder, gen = build.generate(paths_of(ctx), scenario_id, variant, force)
+        folder, gen = build.generate(paths_of(ctx), scenario_id, variant, force, seed)
         t = Table("file", "bytes", "sha256")
         for rel, h in gen.hashes.items():
             t.add_row(rel, str((Path(folder) / rel).stat().st_size), h)
@@ -132,10 +134,11 @@ def register(app: typer.Typer, handled: Callable[..., Any], out: Console, err: C
     @app.command("scenario-build")
     @handled
     def scenario_build(
-        ctx: typer.Context, scenario_id: str, variant: VariantArg, force: Force = False
-    ) -> None:
+        ctx: typer.Context, scenario_id: str, variant: VariantArg, force: Force = False,
+        seed: SeedOpt = None,
+    ) -> None:  # fmt: skip
         """Verify dataset hashes, generate companions, create the case and ingest everything."""
-        case_id, items = build.build_case(paths_of(ctx), scenario_id, variant, force)
+        case_id, items = build.build_case(paths_of(ctx), scenario_id, variant, force, seed)
         t = Table("evidence_id", "source_key", "type", "bytes", "sha256", title=f"case {case_id}")
         for i in items:
             t.add_row(i.evidence_id, i.source_key, i.source_type, str(i.size_bytes), i.sha256[:16])
@@ -143,15 +146,18 @@ def register(app: typer.Typer, handled: Callable[..., Any], out: Console, err: C
 
     @app.command("scenario-verify")
     @handled
-    def scenario_verify(ctx: typer.Context, scenario_id: str) -> None:
-        """Check dataset hashes, alignment, key validity and generator determinism (exit 0/1)."""
-        problems = build.verify_scenario(paths_of(ctx), scenario_id)
+    def scenario_verify(ctx: typer.Context, scenario_id: str, seed: SeedOpt = None) -> None:
+        """Check dataset hashes, alignment, key validity and generator determinism (exit 0/1).
+
+        With --seed also the Phase 4.1 generator invariants of that seed's data.
+        """
+        problems = build.verify_scenario(paths_of(ctx), scenario_id, seed)
+        tag = scenario_id if seed is None else f"{scenario_id} seed {seed}"
         if not problems:
-            out.print(
-                f"scenario {scenario_id}: OK (hashes, alignment, keys, determinism, adjudication)"
-            )
+            what = "hashes, alignment, keys, determinism, adjudication"
+            out.print(f"scenario {tag}: OK ({what}{', invariants' if seed else ''})")
             return
-        err.print(f"[red]scenario {scenario_id}: FAILED[/red]", highlight=False)
+        err.print(f"[red]scenario {tag}: FAILED[/red]", highlight=False)
         for p in problems:
             err.print(f"  - {p}", highlight=False, markup=False)
         raise typer.Exit(1)

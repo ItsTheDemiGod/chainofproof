@@ -28,6 +28,8 @@ from chainofproof.custody.hashing import iso_utc, sha256_json, utc_now
 from chainofproof.custody.ledger import Ledger
 from chainofproof.errors import UserError
 from chainofproof.llm.base import LLMClient, LLMFatal
+from chainofproof.protocol.guard import check_run_allowed, record_test_run
+from chainofproof.protocol.splits import split_of
 from chainofproof.schemas.findings import Finding
 from chainofproof.tools.loader import case_input_sha
 from chainofproof.tools.norm_store import require_version
@@ -91,8 +93,15 @@ def run_agent(
     paths: Paths, case_id: str, client: LLMClient, settings: Settings, *,
     replay_of: str | None = None, clock: Callable[[], float] = time.monotonic,
 ) -> AgentRunResult:  # fmt: skip
-    """Run the agent on a normalized case. Needs schema version 4 and normalized events."""
-    require_version(paths, 4)
+    """Run the agent on a normalized case. Needs schema version 5 and normalized events.
+
+    TEST-split cases (rules E1-E3) are refused unless a matching ``prompt_freeze`` exists.
+    """
+    require_version(paths, 5)
+    if replay_of:  # a replay calls no LLM: allowed for any recorded run
+        split, freeze_id = split_of(case_id), None
+    else:
+        split, freeze_id = check_run_allowed(paths, case_id, settings.agent)  # rules E1-E3
     input_sha = case_input_sha(paths, case_id)
     if input_sha == sha256_json([]):  # no latest normalization runs at all
         raise UserError(f"case {case_id!r} has no normalized events")
@@ -103,12 +112,14 @@ def run_agent(
         "seed": settings.ollama.seed, "settings_json": json.dumps(blob, sort_keys=True),
         "settings_sha256": sha256_json(blob), "prompt_version": prompts.prompt_version(),
         "input_sha256": input_sha, "replay_of": replay_of, "started_at": iso_utc(utc_now()),
-        "status": "running"})  # fmt: skip
+        "status": "running", "split": split})  # fmt: skip
     ledger = Ledger(paths)
     ledger.append("agent:run", "run_start", f"agent-run {case_id}", [input_sha], None,
                   {"run_id": run_id, "case_id": case_id, "model": client.model,
                    "num_ctx": client.num_ctx, "prompt_version": prompts.prompt_version(),
                    "settings_sha256": sha256_json(blob), "replay_of": replay_of})  # fmt: skip
+    if freeze_id:
+        record_test_run(paths, freeze_id, case_id, run_id)
     ctx = RunCtx(paths, case_id, run_id, run_dir, store.root_run(paths, replay_of) if replay_of
                  else run_id, settings.agent, client, Trace(run_dir / "trace.jsonl"), ledger,
                  input_sha, clock, Notebook(settings.agent.known_events_cap))  # fmt: skip
@@ -134,7 +145,9 @@ def run_agent(
     store.finish_run(paths, run_id, status=status, stop_reason=reason,
                      finished_at=iso_utc(utc_now()), llm_calls=c["llm_calls"],
                      tool_calls=c["tool_calls"], prompt_tokens=c["prompt_tokens"],
-                     completion_tokens=c["completion_tokens"], trace_sha256=trace_sha)  # fmt: skip
+                     completion_tokens=c["completion_tokens"], trace_sha256=trace_sha,
+                     arg_errors=c["arg_errors"], format_errors=c["format_errors"],
+                     duplicate_refusals=c["duplicate_refusals"])  # fmt: skip
     ledger.append("agent:run", "run_end", f"agent-run {case_id}", [input_sha], trace_sha,
                   {"run_id": run_id, "status": status, "stop_reason": reason,
                    "trace_sha256": trace_sha, "llm_calls": c["llm_calls"],

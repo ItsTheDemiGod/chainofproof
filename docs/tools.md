@@ -97,3 +97,22 @@ neither, or with both, is refused, so an agent role can never be mistaken for a 
   an agent is rejected.
 * Agents may import neither the registry's implementation modules nor query functions directly: a test
   scans `agents/` and `llm/` for tool-function imports (`call_tool` appears only in `agents/context.py`).
+
+## Typed signatures, lenient filters, templated errors (Phase 5.1)
+
+* `tools/describe.py`: `tool_signature_lines(role)` builds ONE compact line per allowed tool from the
+  registry's pydantic parameter models: `name(param?: type[=default], ...): description`, e.g.
+  `search_events(host?: str|list[str], event_type?: enum[...]|list[enum[...]], time_from?: ISO-8601 UTC string like 2000-01-01T00:00:00Z, limit?: int<=50 (default 25), ...)`.
+  The prompts' TOOLS and WORKERS sections come from it (never hand-written); the example time is
+  generic. Agents may read specs; they still call tools only through `agents/context.py`.
+* String filters (`host`, `event_type`, `user`, `process_image`, `evidence_label`, `conn_id`; `event_id` as
+  int) of `search_events` (and `host` of `timeline_window`, `evidence_label` of `get_detections`) take one
+  value or a list of up to 10 values; an empty list is no filter. They are matched with parameterized
+  `IN (?,..)` clauses (only the placeholders are string-built). Bounds are unchanged: limit default 25,
+  hard maximum 50, `total_matches`, `truncated`. `event_type` is validated against the event-type enum;
+  times are ISO-8601 UTC with `Z` and optional fractional seconds (anything else is rejected).
+* Argument errors returned to an agent are templated from the validation error: `invalid arguments for
+  <tool>: <param> expects <type>; ...` (enum values listed, the ISO example for times, `unknown parameter
+  (allowed: ...)`) and never contain the value the model supplied. The same holds for an unknown tool name
+  and an unknown graph node id. The agent observation of a failed call also carries the tool's signature line.
+* Detector descriptions are generic and factual: what each check does, with its limitation.

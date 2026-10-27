@@ -55,6 +55,8 @@ agent:
   claim_max_chars: 400
   ledger_llm_calls: true
   request_timeout_seconds: 300
+  max_arg_errors_per_worker: 4   # invalid-argument tool calls do not cost steps; this caps them
+  mandatory_correlator_review: false   # true: the planner must delegate to the correlator once
 
 optional_cloud:
   enabled: false

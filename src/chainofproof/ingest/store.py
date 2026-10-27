@@ -16,6 +16,7 @@ from chainofproof.custody.migrations import (
     create_v2_tables,
     create_v3_tables,
     create_v4_tables,
+    create_v5_tables,
 )
 from chainofproof.errors import UserError
 from chainofproof.schemas.custody import (
@@ -83,6 +84,7 @@ class EvidenceStore:
                 create_v2_tables(conn)
                 create_v3_tables(conn)
                 create_v4_tables(conn)
+                create_v5_tables(conn)
                 conn.execute("INSERT INTO schema_version(version) VALUES (?)", (SCHEMA_VERSION,))
 
     # ---- cases ---------------------------------------------------------------------------

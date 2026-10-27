@@ -15,6 +15,7 @@ from chainofproof.ingest.store import EvidenceStore
 from chainofproof.scenarios.dataset import (
     dataset_root,
     generated_dir,
+    key_file,
     require_dataset,
     scenario_dir,
     scenarios_root,
@@ -23,6 +24,7 @@ from chainofproof.scenarios.dataset import (
 from chainofproof.scenarios.fieldscan import load_known_events, load_real_pipes
 from chainofproof.scenarios.gen_context import REAL_FMT, parse_real
 from chainofproof.scenarios.generator import GenResult, generate_variant
+from chainofproof.scenarios.invariants import check_generated
 from chainofproof.scenarios.inventory import (
     Inventory,
     load_inventory,
@@ -107,13 +109,28 @@ def check_alignment(scenario: Scenario, inv: Inventory) -> list[str]:
     return problems
 
 
+def seeded(scenario: Scenario, seed: int | None) -> Scenario:
+    """The scenario with another seed applied (no committed file changes); None = base seed."""
+    return scenario if seed is None else scenario.model_copy(update={"seed": seed})
+
+
+def case_id_of(scenario_id: str, variant: Variant, seed: int | None = None) -> str:
+    """``<scenario>_<variant>`` or ``<scenario>_s<seed>_<variant>``."""
+    return (
+        f"{scenario_id}_{variant.value}"
+        if seed is None
+        else (f"{scenario_id}_s{seed}_{variant.value}")
+    )
+
+
 def generate(
-    paths: Paths, scenario_id: str, variant: Variant, force: bool = False
+    paths: Paths, scenario_id: str, variant: Variant, force: bool = False, seed: int | None = None
 ) -> tuple[Path, GenResult]:
     """Generate one variant's companion files into the gitignored generated folder."""
     scenario, inv = load_all(scenario_id)
-    out = generated_dir(paths, scenario_id, variant.value)
-    keyfile = scenario_dir(scenario_id) / KEY_FILES[variant]
+    scenario = seeded(scenario, seed)
+    out = generated_dir(paths, scenario_id, variant.value, seed)
+    keyfile = key_file(scenario_id, variant.value, seed)
     if out.is_dir() and any(out.iterdir()) and not force and keyfile.is_file():
         known = load_key(keyfile, scenario).generated_file_hashes
         stale = [r for r, h in known.items() if (out / r).is_file() and sha256_file(out / r) != h]
@@ -122,15 +139,17 @@ def generate(
     return out, generate_variant(scenario, inv, variant, out, real_pipes(scenario_id, scenario))
 
 
-def write_keys(scenario_id: str) -> list[Path]:
-    """(Re)write key_clean.yaml and key_perturbed.yaml from a fresh generator run."""
+def write_keys(scenario_id: str, seed: int | None = None) -> list[Path]:
+    """(Re)write key_clean.yaml and key_perturbed.yaml (seed keys: ``seeds/<S>/``)."""
     scenario, inv = load_all(scenario_id)
-    written = []
     pipes = real_pipes(scenario_id, scenario)
+    scenario = seeded(scenario, seed)
+    written = []
     for variant in Variant:
         with tempfile.TemporaryDirectory(prefix="cop_keys_") as tmp:
             gen = generate_variant(scenario, inv, variant, Path(tmp), pipes)
-        path = scenario_dir(scenario_id) / KEY_FILES[variant]
+        path = key_file(scenario_id, variant.value, seed)
+        path.parent.mkdir(parents=True, exist_ok=True)
         save_key(path, build_key(scenario, inv, variant, gen))
         written.append(path)
     return written
@@ -148,20 +167,20 @@ class BuiltItem:
 
 
 def build_case(
-    paths: Paths, scenario_id: str, variant: Variant, force: bool = False
+    paths: Paths, scenario_id: str, variant: Variant, force: bool = False, seed: int | None = None
 ) -> tuple[str, list[BuiltItem]]:
     """Verify dataset, generate companions, create the case and ingest every source."""
     scenario, _ = load_all(scenario_id)
     require_dataset(scenario, dataset_root(paths))
-    gen_dir, _ = generate(paths, scenario_id, variant, force)
-    case_id = f"{scenario_id}_{variant.value}"
+    gen_dir, _ = generate(paths, scenario_id, variant, force, seed)
+    case_id = case_id_of(scenario_id, variant, seed)
     store = EvidenceStore(paths)
-    label = f"{scenario.scenario_id} ({variant.value})"
+    label = f"{scenario.scenario_id} ({variant.value})" + ("" if seed is None else f" seed {seed}")
     existing = store.get_case(case_id)
     if existing is None:
         store.create_case(case_id, scenario.title, label)
-    elif existing.description != label:  # never mix evidence of different scenario revisions
-        raise ScenarioError(f"case {case_id} exists but was created for another scenario")
+    elif existing.description != label:  # never mix evidence of other scenarios or other seeds
+        raise ScenarioError(f"case {case_id} exists but was created for another scenario or seed")
     items = []
     for s in scenario.sources:
         real = s.kind == SourceKind.real_evtx
@@ -179,16 +198,21 @@ def build_case(
     return case_id, items
 
 
-def verify_scenario(paths: Paths, scenario_id: str) -> list[str]:
-    """Full check: dataset hashes, alignment, key validity, regeneration determinism."""
+def verify_scenario(paths: Paths, scenario_id: str, seed: int | None = None) -> list[str]:
+    """Full check: dataset hashes, alignment, key validity, regeneration determinism.
+
+    With ``seed`` the seed's committed keys are checked against freshly generated data, plus the
+    Phase 4.1 generator invariants (``scenarios/invariants.py``).
+    """
     d = scenario_dir(scenario_id)
-    scenario, inv = load_all(scenario_id)
-    problems = verify_dataset(scenario, dataset_root(paths))
-    problems += check_alignment(scenario, inv)
-    pipes = real_pipes(scenario_id, scenario)
-    keys: list[AnswerKey] = []
+    base, inv = load_all(scenario_id)
+    problems = verify_dataset(base, dataset_root(paths))
+    problems += check_alignment(base, inv)
+    pipes = real_pipes(scenario_id, base)
+    scenario = seeded(base, seed)
+    keys: dict[Variant, AnswerKey] = {}
     for variant in Variant:
-        kf = d / KEY_FILES[variant]
+        kf = key_file(scenario_id, variant.value, seed)
         if not kf.is_file():
             problems.append(f"{kf.name}: missing")
             continue
@@ -197,11 +221,24 @@ def verify_scenario(paths: Paths, scenario_id: str) -> list[str]:
         except ScenarioError as e:
             problems.append(str(e))
             continue
-        keys.append(key)
+        keys[variant] = key
         problems += _check_determinism(scenario, inv, variant, key, pipes)
         if variant == Variant.perturbed:
             problems += _check_collateral(scenario, inv, key, pipes)
-    return problems + _check_adjudication(d, scenario, keys)
+    if seed is not None and len(keys) == len(Variant):
+        problems += _check_invariants(scenario, inv, keys, pipes)
+    return problems + _check_adjudication(d, scenario, list(keys.values()))
+
+
+def _check_invariants(
+    scenario: Scenario, inv: Inventory, keys: dict[Variant, AnswerKey],
+    pipes: dict[str, frozenset[str]],
+) -> list[str]:  # fmt: skip
+    with tempfile.TemporaryDirectory(prefix="cop_inv_") as tmp:
+        dirs = {v: Path(tmp) / v.value for v in Variant}
+        for v, folder in dirs.items():
+            generate_variant(scenario, inv, v, folder, pipes)
+        return check_generated(dirs, keys)
 
 
 def _check_collateral(

@@ -28,8 +28,7 @@ from chainofproof.eval.gt_link import (
     contradiction_refs,
     key_action_refs,
 )
-from chainofproof.scenarios.dataset import scenario_dir
-from chainofproof.scenarios.source_map import load_case_scenario
+from chainofproof.scenarios.source_map import case_key_path, load_case_scenario
 from chainofproof.schemas.scenario import load_key
 
 Row = dict[str, Any]
@@ -181,7 +180,7 @@ def _position(rows: list[Row], uids: set[str]) -> tuple[list[int], list[int]]:
 def audit_case(paths: Paths, case_id: str) -> Audit:
     """Audit the synthetic sources of one case."""
     scn, variant = load_case_scenario(case_id)
-    key = load_key(scenario_dir(scn.scenario_id) / f"key_{variant.value}.yaml", scn)
+    key = load_key(case_key_path(case_id), scn)
     idx = build_index(paths, case_id)
     refs = _referenced(idx, key)
     a = Audit(case_id)

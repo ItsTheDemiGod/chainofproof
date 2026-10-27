@@ -129,6 +129,35 @@
 - **Quality gates:** `tools/registry.py` (351 lines) was split (`registry_args.py`), `scenarios/generator.py` (313) was split (`gen_perturb.py`); no source file is over 300 lines. `ruff format` reformatted 12 files in `src` and `tests`. The new `docs/detector_baseline.md` and `docs/hayabusa_baseline.md` were regenerated from the v4 cases.
 - **Process notes:** (1) I appended a function to `fieldscan.py` with a shell heredoc and `sed` once, against your process rule; I reverted that file with `git checkout` and redid the change with the Edit tool before anything was committed. (2) One read-only name-count check ran as `python -I -` reading an inline script from stdin under `.venv` (no file created, nothing rewritten). (3) Scratch analysis scripts live in the session scratchpad, not in the repository.
 
+## Phase 5.1 (agent interface fixes, dev/test split)
+- **Baseline:** 512 passed / 4 skipped / 1 deselected, ledger head LED-000975, `scenario-verify credtheft_lateral_v4` OK, dataset clone clean, Ollama up. Now 598 passed.
+- **Freeze fingerprint:** `settings_sha256` = sha256 of the canonical JSON of the `agent` settings block (not the per-run blob that `agent_runs.settings_sha256` stores); `tool_registry_sha256` = sha256 of every tool's `schema()` (name, description, parameter and return schemas, roles). The freeze matches when prompt_version, settings and tool hash are all equal; the model name is recorded but not compared (as specified). `agent-replay` skips the guard (no LLM is called); `agent-peek` applies it to TEST runs.
+- **Guard placement:** `protocol.guard.check_run_allowed(paths, case, agent_settings)` takes the settings object the run really uses (the specified two-argument form would have to guess them); `run_agent` calls it before creating the run folder. `protocol` imports `agents.prompts` lazily inside `current_fingerprint` to avoid a cycle with the runner.
+- **Process slip (mine):** my first build loop piped `normalize` through `Select-Object -First 2`, which ended the command early; only 2 of 13 sources per case were normalized. I reran `normalize` and `graph-build` for all 16 cases without early-exit pipes. Consequence: the first two EVTX items of each new case have two normalization runs (insert-only; reads use the latest) and each case has an extra, truncated `graph_runs` row. Nothing was deleted; the ledger shows both.
+- **Seed cases:** a seed case is `credtheft_lateral_v4_s<S>_<variant>`; `parse_case_id` strips `_s<S>`; `load_case_scenario` applies the seed via `model_copy` (the way the Phase 4 robustness run did); `case_key_path` replaces the hard-coded `key_<variant>.yaml` lookups in the eval modules. `build_case` refuses a case id whose stored label names another seed or scenario. Invariants (`scenarios/invariants.py`) are the Phase 4.1 test checks as library code; the connection check runs on the clean variant only (the perturbed log gap leaves one-ended collateral by design). All 8 seeds pass `scenario-verify --seed`; no generator change was needed.
+- **DEV detector check (not agent runs):** seeds 201-203: perturbed cases 3/3 contradictions found, 0 unexpected hits, explained collateral 2/2 (s201) and 3/3 (s202, s203); clean cases only the log_clear action indicator. Same as base v4. No detector or evaluation command was run on seeds 301-305.
+- **Typed signatures:** the `Limit` and time parameters carry a `Field(description=...)` that the signature line prints as the type (`int<=50 (default 25)`, `ISO-8601 UTC string like 2000-01-01T00:00:00Z`); a limit above 50 is still clamped, not rejected (an earlier test pins it). Unknown graph node ids and unknown tool names no longer echo the model's text.
+- **Prompt sizes (estimated tokens = characters / 3):** v4 planner 1264, extractor 1414, correlator 1778. The correlator is above the "about 1600" target because its tool list (five detectors with thresholds and defaults) is long; real tokens are about a quarter of the characters (roughly 1330). Not shortened further to avoid dropping type information.
+- **Mechanical dev check (criteria in `docs/evaluation_protocol.md`, written before the runs):**
+
+| round | prompt | run | case | tool-error rate | invalid-JSON failures | format-error rate | status | EVT seen | all pass |
+|---|---|---|---|---|---|---|---|---|---|
+| 0 | v2 | RUN-000589 | base perturbed | 0.000 | 0 | 0.000 | completed | yes | yes |
+| 0 | v2 | RUN-000591 | base clean | 0.071 | 3 | 0.255 | budget_exhausted | yes | no |
+| 0 | v2 | RUN-000593 | s201 perturbed | 0.188 | 2 | 0.098 | budget_exhausted | yes | no |
+| 0 | v2 | RUN-000597 | s202 clean | 0.100 | 0 | 0.245 | budget_exhausted | yes | no |
+| 1 | v3 | RUN-000600 | base perturbed | 0.000 | 0 | 0.000 | completed | yes | yes |
+| 1 | v3 | RUN-000603 | base clean | 0.000 | 0 | 0.429 | completed | yes | no |
+| 1 | v3 | RUN-000607 | s201 perturbed | 0.107 | 0 | 0.185 | completed | yes | yes |
+| 1 | v3 | RUN-000609 | s202 clean | 0.000 | 2 | 1.000 | failed | no | no |
+| 2 | v4 | RUN-000611 | base perturbed | 0.148 | 1 | 0.038 | completed | yes | no |
+| 2 | v4 | RUN-000614 | base clean | 0.000 | 0 | 0.800 | completed | no | no |
+| 2 | v4 | RUN-000617 | s201 perturbed | 0.000 | 0 | 0.167 | completed | yes | yes |
+| 2 | v4 | RUN-000619 | s202 clean | 0.000 | 0 | 1.000 | completed | no | no |
+
+  The criteria are NOT met after two fix rounds (1 of 4 pass in the last round); per the protocol I stopped. Remaining mechanical problems (not fixed): (1) in the two clean cases the planner delegates only to the correlator, the detectors return no hit, so the worker never sees an EVT id and cites source labels (runs 614, 619; run 609 before); (2) one `json_invalid` failure in run 611 (a reply cut off at the output cap); (3) 33 duplicate refusals in run 611 (the model repeats findings). These are Phase 6 inputs; I did not change anything after `agent-peek`.
+- **E3 compliance:** no `agent-run`, `agent-freeze`, `agent-peek` or detector/eval command touched a TEST case; the ledger has no `prompt_freeze` or `test_split_run` entry and `agent_runs` has no `split = 'test'` row.
+
 ## Phase 5 (agent core)
 - **Preflight baseline:** 376 passed / 4 skipped / 1 deselected with `-m "not llm"` (377 passed when the llm-marked smoke test is included), ledger head LED-000511 (`c40e9513...`), `scenario-verify credtheft_lateral_v4` OK, dataset clone clean, `tools-check` OK, Ollama up with both models present. After Phase 5: see `docs/phase_reports/phase_5.md`.
 - **LLM library:** the `ollama` Python package (already a dependency; `scripts/check_ollama.py` used it). The transport is injectable (`OllamaClient(transport=...)`) so tests use a fake transport; `httpx` is only used for its exception classes.

@@ -128,7 +128,7 @@ def _build() -> dict[str, ToolSpec]:
         ),
         ToolSpec(
             "get_detections",
-            "Hayabusa detections by source label or event.",
+            "Hayabusa detections; filters: evidence_label or event_uid only.",
             DetectionsArgs,
             q.DetectionPage,
             R({"extractor"}),
@@ -194,16 +194,19 @@ def _build() -> dict[str, ToolSpec]:
         ),
     ]
     descr = {
-        "timestomp": "Compare $STANDARD_INFORMATION and $FILE_NAME times in file-system records.",
-        "clock_skew": "Find sources whose clocks disagree about shared conn ids / pipe names.",
-        "log_gap": "Find missing sequence numbers in auth logs and what happened meanwhile.",
-        "log_clear": "Find cleared audit logs and the activity right after.",
-        "unmatched_connection": "Find connection ids seen at only one end.",
+        "timestomp": "Compare standard-information and file-name times of file records "
+        "(file timelines only).",
+        "clock_skew": "Find sources whose clocks disagree about shared connection ids or pipe "
+        "names (needs one event seen in two sources).",
+        "log_gap": "Find missing sequence numbers in numbered logs and what happened meanwhile.",
+        "log_clear": "Find cleared audit logs and the activity right after (logged clears only).",
+        "unmatched_connection": "Find connection ids seen at only one end (a log gap can explain "
+        "one).",
     }
     for name, (_, model) in DETECTORS.items():
-        t.append(ToolSpec(f"detect_{name}", descr[name] + " Explicit parameters override defaults.",
-                          det_args(name, model), DetectorResult, R({"correlator", "skeptic"}),
-                          _run_det(name)))  # fmt: skip
+        text = descr[name] + " Thresholds only (no filters); {} = defaults."
+        t.append(ToolSpec(f"detect_{name}", text, det_args(name, model), DetectorResult,
+                          R({"correlator", "skeptic"}), _run_det(name)))  # fmt: skip
     return {s.name: s for s in t}
 
 
@@ -249,14 +252,15 @@ def _call(role: str, name: str, args: dict[str, Any] | None, paths: Paths, case_
         raise ToolError(f"unknown role {role!r}")
     spec = TOOLS.get(name)
     if spec is None:
-        raise ToolError(f"unknown tool {name!r}")
+        raise ToolError("unknown tool: call one of the tools in your tool list")
     if role not in spec.roles:
         raise ToolError(f"role {role!r} may not call {name!r}")
     try:
         parsed = spec.params.model_validate(args or {})
-    except ValidationError as e:
-        bad = ", ".join(sorted({".".join(str(x) for x in err["loc"]) or "?" for err in e.errors()}))
-        raise ToolError(f"invalid arguments for {name}: {bad}") from None
+    except ValidationError as e:  # templated: parameter names and expected types, no echo
+        from chainofproof.tools.describe import arg_error_message
+
+        raise ToolError(arg_error_message(name, spec.params, e)) from None
     try:
         result = spec.fn(paths, case_id, parsed).model_dump(mode="json")
     except ToolError:

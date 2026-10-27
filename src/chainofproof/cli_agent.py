@@ -24,11 +24,12 @@ from chainofproof.agents.replay import replay_run
 from chainofproof.agents.runner import run_agent
 from chainofproof.agents.trace import read_trace
 from chainofproof.config import Paths, Settings, load_settings
-from chainofproof.custody.migrations import migrate_to_v4
+from chainofproof.custody.migrations import migrate_to_v5
 from chainofproof.errors import UserError
 from chainofproof.llm.base import LLMClient
 from chainofproof.llm.fake import FakeLLMClient
 from chainofproof.llm.ollama_client import OllamaClient
+from chainofproof.protocol.guard import current_fingerprint, write_freeze
 
 CLAIM_COLUMN_CAP = 120
 
@@ -113,13 +114,13 @@ def register(app: typer.Typer, handled: Callable[..., Any], out: Console, err: C
         seed: Annotated[int | None, typer.Option(help="Sampling seed")] = None,
         llm: Annotated[str, typer.Option("--llm", help="ollama or fake:PATH")] = "ollama",
     ) -> None:
-        """Run the agent on a normalized case (migrates the database to schema v4 first)."""
+        """Run the agent on a normalized case (migrates the database to schema v5 first)."""
         paths, s = paths_of(ctx), load_settings()
         if max_rounds is not None:
             s.agent.planner_max_rounds = max_rounds
         if seed is not None:
             s.ollama.seed = seed
-        migrate_to_v4(paths)
+        migrate_to_v5(paths)
         res = run_agent(paths, case_id, make_client(llm, s, model), s)
         c = res.counts
         by = Counter(f.status for f in res.findings)
@@ -201,6 +202,34 @@ def register(app: typer.Typer, handled: Callable[..., Any], out: Console, err: C
         for p in rep.problems:
             err.print(p, highlight=False, markup=False)
         raise typer.Exit(1)
+
+    @app.command("agent-freeze")
+    @handled
+    def agent_freeze(
+        ctx: typer.Context,
+        confirm: Annotated[
+            bool, typer.Option("--confirm", help="Required to write the freeze")
+        ] = False,
+        note: Annotated[
+            str | None, typer.Option(help="Optional note stored with the freeze")
+        ] = None,
+        model: Annotated[
+            str | None, typer.Option(help="Model name (default from settings)")
+        ] = None,
+    ) -> None:
+        """HUMANS ONLY (rule E3): freeze prompts, settings and tools before TEST-split runs."""
+        s = load_settings()
+        m = model or s.agent.default_model
+        fp = current_fingerprint(s.agent)
+        out.print("this will freeze:")
+        out.print(f"  prompt_version        {fp.prompt_version}")
+        out.print(f"  settings_sha256       {fp.settings_sha256}")
+        out.print(f"  tool_registry_sha256  {fp.tool_registry_sha256}")
+        out.print(f"  model                 {m}")
+        if not confirm:
+            err.print("refusing without --confirm: nothing was written", highlight=False)
+            raise typer.Exit(1)
+        out.print(f"freeze written: {write_freeze(paths_of(ctx), s.agent, m, note)}")
 
     @app.command("agent-peek")
     @handled
