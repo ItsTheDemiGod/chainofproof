@@ -30,6 +30,7 @@ from chainofproof.scenarios.inventory import (
     save_inventory,
 )
 from chainofproof.scenarios.keyevents import APPENDED
+from chainofproof.scenarios.keylinks import check_link_refs
 from chainofproof.scenarios.keys import build_key
 from chainofproof.schemas.adjudication import load_adjudication
 from chainofproof.schemas.scenario import (
@@ -211,7 +212,8 @@ def _check_determinism(
 ) -> list[str]:
     with tempfile.TemporaryDirectory(prefix="cop_verify_") as tmp:
         gen = generate_variant(scenario, inv, variant, Path(tmp))
-    out = [
+        links_bad = check_link_refs(key, scenario, inv, Path(tmp))
+    out = links_bad + [
         f"{variant.value}/{rel}: hash differs from key"
         for rel, h in key.generated_file_hashes.items()
         if gen.hashes.get(rel) != h

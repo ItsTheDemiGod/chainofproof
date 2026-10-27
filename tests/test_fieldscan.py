@@ -15,7 +15,7 @@ from chainofproof.scenarios.fieldscan import (
     scan_file,
 )
 from chainofproof.scenarios.keyevents import rule_s2, rule_s3, rule_s4
-from conftest import V2_DIR
+from conftest import V3_DIR
 from test_scenario_inventory import ev
 
 SEC = "Security"
@@ -157,18 +157,18 @@ def test_s4_rule_keeps_all_three_pipes():
 
 # ---- dataset-marked: the committed inspection equals a fresh scan of the real files --------------
 @pytest.mark.dataset
-def test_field_inspection_matches_real_files(v2):
+def test_field_inspection_matches_real_files(v3):
     root = dataset_root(get_paths())
     if not root.is_dir():
         pytest.skip("data/downloads/EVTX-ATTACK-SAMPLES not present")
-    for spec in v2.scn.sources:
+    for spec in v3.scn.sources:
         if spec.is_synthetic:
             continue
-        got = v2.insp["sources"][spec.source_key]
+        got = v3.insp["sources"][spec.source_key]
         fresh = scan_file(root / spec.relative_path, with_rows="events" in got)
         fresh.update(stage_id=spec.stage_id, sha256=spec.sha256)
         assert json.loads(json.dumps(fresh)) == got, spec.source_key
     # the 1102 relation stated in docs/decisions.md
-    rows = {r["record_id"]: r for r in v2.rows("s2_pth_logon")}
-    delta = v2.aligned("s2_pth_logon", rows[432903]) - v2.aligned("s2_pth_logon", rows[432901])
-    assert delta.total_seconds() == 4 and V2_DIR.is_dir()
+    rows = {r["record_id"]: r for r in v3.rows("s2_pth_logon")}
+    delta = v3.aligned("s2_pth_logon", rows[432903]) - v3.aligned("s2_pth_logon", rows[432901])
+    assert delta.total_seconds() == 4 and V3_DIR.is_dir()

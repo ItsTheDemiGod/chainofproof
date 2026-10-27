@@ -33,6 +33,7 @@ FS_COLUMNS = [
 ]
 TS_FMT = "%Y-%m-%dT%H:%M:%SZ"
 _TS = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
+_CONN_ID = re.compile(r"^CONN-\d{3}$")  # shared by the two ends of one synthetic connection
 _AUTH_REQUIRED = ("seq", "ts", "host", "event")
 
 
@@ -119,6 +120,8 @@ def parse_auth_text(text: str, name: str = "auth") -> list[dict[str, str]]:
             parse_ts(row["ts"])
         except ValueError:
             raise CompanionParseError(f"{name}: line {no}: invalid timestamp") from None
+        if "conn_id" in row and not _CONN_ID.match(row["conn_id"]):
+            raise CompanionParseError(f"{name}: line {no}: invalid conn_id")
         rows.append(row)
     return rows
 

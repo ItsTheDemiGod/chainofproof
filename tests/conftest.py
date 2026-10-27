@@ -30,13 +30,13 @@ def make_file(tmp_path):
     return _make
 
 
-# ---- the committed credtheft_lateral_v2 scenario, generated once per session ----------------
-V2_DIR = Path(__file__).resolve().parents[1] / "scenarios" / "credtheft_lateral_v2"
+# ---- the committed credtheft_lateral_v3 scenario, generated once per session ----------------
+V3_DIR = Path(__file__).resolve().parents[1] / "scenarios" / "credtheft_lateral_v3"
 
 
 @dataclass
-class V2Data:
-    """Committed v2 files plus both generated variants (no dataset needed)."""
+class V3Data:
+    """Committed v3 files plus both generated variants (no dataset needed)."""
 
     scn: Scenario
     inv: Inventory
@@ -55,13 +55,13 @@ class V2Data:
 
 
 @pytest.fixture(scope="session")
-def v2(tmp_path_factory) -> V2Data:
-    scn = load_scenario(V2_DIR / "scenario.yaml")
-    inv = load_inventory(V2_DIR / "inventory.json")
-    insp = json.loads((V2_DIR / "field_inspection.json").read_text(encoding="utf-8"))
-    keys = {v: load_key(V2_DIR / f"key_{v.value}.yaml", scn) for v in Variant}
+def v3(tmp_path_factory) -> V3Data:
+    scn = load_scenario(V3_DIR / "scenario.yaml")
+    inv = load_inventory(V3_DIR / "inventory.json")
+    insp = json.loads((V3_DIR / "field_inspection.json").read_text(encoding="utf-8"))
+    keys = {v: load_key(V3_DIR / f"key_{v.value}.yaml", scn) for v in Variant}
     dirs = {}
     for v in Variant:
-        dirs[v] = tmp_path_factory.mktemp(f"v2_{v.value}")
+        dirs[v] = tmp_path_factory.mktemp(f"v3_{v.value}")
         generate_variant(scn, inv, v, dirs[v])
-    return V2Data(scn, inv, insp, keys, dirs)
+    return V3Data(scn, inv, insp, keys, dirs)

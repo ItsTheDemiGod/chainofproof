@@ -22,6 +22,8 @@ DEC_ID_PATTERN = r"^GT-DEC-\d{3}$"
 INJ_ID_PATTERN = r"^GT-INJ-\d{3}$"
 MIS_ID_PATTERN = r"^GT-MIS-\d{3}$"
 ADJ_ID_PATTERN = r"^GT-ADJ-\d{3}$"
+LNK_ID_PATTERN = r"^GT-LNK-\d{3}$"
+CONN_ID_PATTERN = r"^CONN-\d{3}$"
 STAGE_ID_PATTERN = r"^(S[1-9]|D[1-9])$"
 SOURCE_KEY_PATTERN = r"^[a-z0-9_]{1,48}$"
 TECHNIQUE_PATTERN = r"^T\d{4}(\.\d{3})?$"
@@ -67,6 +69,22 @@ class ContradictionKind(StrEnum):
     timestomp = "timestomp"
     log_gap = "log_gap"
     clock_skew = "clock_skew"
+
+
+class LinkKind(StrEnum):
+    """What a ground-truth cross-stage / cross-host link is."""
+
+    credential_reuse = "credential_reuse"
+    lateral_movement = "lateral_movement"
+    remote_replication = "remote_replication"
+    stage_continuation = "stage_continuation"
+
+
+class LinkBasis(StrEnum):
+    """Why the link exists: only SYNTHETIC lines say so, or only the alignment layer does."""
+
+    synthetic_only = "synthetic_only"
+    alignment_constructed = "alignment_constructed"
 
 
 class Variant(StrEnum):

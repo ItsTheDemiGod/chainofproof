@@ -93,7 +93,7 @@ def test_build_refuses_drifted_dataset(env):
 
 
 # ---- real dataset ------------------------------------------------------------------------
-REAL_SCN = Path(__file__).resolve().parents[1] / "scenarios" / "credtheft_lateral_v2"
+REAL_SCN = Path(__file__).resolve().parents[1] / "scenarios" / "credtheft_lateral_v3"
 
 
 def _root():
@@ -123,4 +123,4 @@ def test_real_inventory_matches_fresh_run():
 
 @pytest.mark.dataset
 def test_real_scenario_verify_passes():
-    assert build.verify_scenario(get_paths(), "credtheft_lateral_v2") == []
+    assert build.verify_scenario(get_paths(), "credtheft_lateral_v3") == []

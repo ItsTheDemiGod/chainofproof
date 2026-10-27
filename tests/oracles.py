@@ -76,6 +76,48 @@ def oracle_log_gap(auth_log: Path, real_times: list[datetime]) -> list[dict]:
     return gaps
 
 
+def _connection_ends(lines: list[dict[str, str]]) -> dict[str, dict[str, dict[str, str]]]:
+    """conn_id -> {"source": CONN_OUT line, "dest": the other end}, over lines of all hosts."""
+    out: dict[str, dict[str, dict[str, str]]] = {}
+    for ln in lines:
+        if "conn_id" in ln:
+            out.setdefault(ln["conn_id"], {})["source" if ln["event"] == "CONN_OUT" else "dest"] = (
+                ln
+            )
+    return out
+
+
+def oracle_cross_host_pair_delta(lines: list[dict[str, str]]) -> dict[str, int]:
+    """conn_id -> seconds by which the destination-side line is later than the source-side line.
+
+    Only connections with both ends on different hosts. Synthetic vs synthetic: no real event.
+    """
+    return {
+        cid: int((parse_ts(e["dest"]["ts"]) - parse_ts(e["source"]["ts"])).total_seconds())
+        for cid, e in _connection_ends(lines).items()
+        if {"source", "dest"} <= set(e) and e["source"]["host"] != e["dest"]["host"]
+    }
+
+
+def oracle_unmatched_connections(lines: list[dict[str, str]]) -> list[dict]:
+    """Connections that have only one end: which side is present, on which host, at which seq."""
+    return [
+        {"conn_id": cid, "present_side": side, "host": e[side]["host"], "seq": int(e[side]["seq"])}
+        for cid, e in sorted(_connection_ends(lines).items())
+        for side in e
+        if len(e) == 1
+    ]
+
+
+def all_auth_lines(folder: Path) -> list[dict[str, str]]:
+    """Every auth line of the three hosts of a generated variant."""
+    return [
+        ln
+        for h in ("ws_fin_07", "srv_file_02", "dc_01")
+        for ln in parse_auth_log(folder / f"auth_{h}.log")
+    ]
+
+
 @dataclass
 class Case:
     """Everything a check needs: generated dirs, scenario, field inspection, the key's claim."""
@@ -139,6 +181,35 @@ def _check_real_in_gap(c: Case) -> bool:
     )
 
 
+def _check_cross_pair(c: Case) -> bool:
+    pairs = c.claim.params["cross_host_pairs"]
+    clean = oracle_cross_host_pair_delta(all_auth_lines(c.clean))
+    pert = oracle_cross_host_pair_delta(all_auth_lines(c.perturbed))
+    want = {p["conn_id"]: p["perturbed_delta_seconds"] for p in pairs}
+    return (
+        bool(pairs)
+        and set(clean.values()) == {0}  # clean: every connection has both ends, 0 s apart
+        and {p["conn_id"]: p["clean_delta_seconds"] for p in pairs} == {k: 0 for k in want}
+        and pert == want  # perturbed: exactly the planted pair(s), at the key's magnitude
+        and set(want.values()) == {int(c.claim.magnitude)}
+    )
+
+
+def _check_unmatched(c: Case) -> bool:
+    want = c.claim.params["unmatched_connections"]
+    found = oracle_unmatched_connections(all_auth_lines(c.perturbed))
+    got = [(f["conn_id"], f["present_side"], _auth_key(f["host"]), f["seq"]) for f in found]
+    exp = [
+        (w["conn_id"], w["present_side"], w["present"]["source_key"], w["present"]["seq"])
+        for w in want
+    ]
+    return oracle_unmatched_connections(all_auth_lines(c.clean)) == [] and got == exp and bool(exp)
+
+
+def _auth_key(host: str) -> str:
+    return f"auth_{host.lower().replace('-', '_')}"
+
+
 def parse_ts_window(p: dict[str, Any], t: datetime) -> bool:
     """True when ``t`` lies in the key's removed window [window_start, window_end)."""
     return parse_ts(p["window_start"]) <= t < parse_ts(p["window_end"])
@@ -149,4 +220,6 @@ CHECKS: dict[str, Callable[[Case], bool]] = {
     "paired_line_time_delta": _check_paired_delta,
     "seq_discontinuity": _check_seq_gap,
     "real_events_inside_gap": _check_real_in_gap,
+    "cross_host_pair_delta": _check_cross_pair,
+    "unmatched_connection": _check_unmatched,
 }

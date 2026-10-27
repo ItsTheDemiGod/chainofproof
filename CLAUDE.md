@@ -35,6 +35,7 @@ Agents may all use the same local model with different prompts and different too
 - Phase 1: Evidence ingestion and chain of custody [DONE]
 - Phase 2: Datasets and ground truth (answer keys) [DONE]
 - Phase 2.1: Synthetic/real alignment and key completion [DONE]
+- Phase 2.2: Cross-host synthetic links [DONE]
 - Phase 3: Forensic tool layer and normalized event format [TODO]
 - Phase 4: Evidence graph and contradiction detection [TODO]
 - Phase 5: Agent core (LLM client, planner loop, citation verifier) [TODO]

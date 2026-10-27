@@ -9,11 +9,12 @@ after sorting and increases by exactly 1 per line within a host.
 from __future__ import annotations
 
 import random
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import timedelta
 
 from chainofproof.scenarios.companions import MARKER, Pairing, fmt_ts
 from chainofproof.scenarios.gen_context import GenContext
+from chainofproof.scenarios.gen_links import link_lines
 
 USERS = ["a.rivera", "j.chen", "m.okafor", "s.novak", "t.haddad", "l.silva", "d.kim", "r.patel"]
 SHARES = ["Finance", "Public", "Home$", "Projects"]
@@ -36,7 +37,8 @@ class AuthResult:
 
     lines: list[dict[str, str]]
     key_seq: dict[str, int]
-    pairings: dict[str, Pairing]  # tag -> pairing of each key line
+    pairings: dict[str, Pairing]  # tag -> pairing of each key line (and link line)
+    link_seq: dict[str, int] = field(default_factory=dict)  # tag -> seq of each link line
 
 
 def _logon_id(rng: random.Random) -> str:
@@ -138,17 +140,18 @@ def generate_auth(ctx: GenContext, host: str) -> AuthResult:
     hosts = list(HOST_EVENTS)
     total = ctx.scenario.noise.benign_auth_lines_total
     count = total // len(hosts) + (1 if hosts.index(host) < total % len(hosts) else 0)
-    keyed = _key_lines(ctx, host)
+    keyed = _key_lines(ctx, host) + link_lines(ctx, host)
     pairings = {tag: pr for tag, _, pr in keyed}
     items = [("", r) for r in _benign(ctx, host, count, rng)] + [(t, r) for t, r, _ in keyed]
     items.sort(key=lambda it: it[1]["ts"])  # stable: key lines keep insertion order on ties
-    lines, key_seq = [], {}
-    for i, (tag, r) in enumerate(items, 1):
+    lines, key_seq, link_seq = [], {}, {}
+    for i, (tag, r) in enumerate(items, 1):  # seq is assigned after insertion, so it is contiguous
         if tag:
-            r = {**r, "pair": f"{pairings[tag].field}:{pairings[tag].value}"}
-            key_seq[tag] = i
+            k, _, v = pairings[tag].marker().partition("=")  # pair=<f>:<v> or synth_only=1
+            r = {**r, k: v}
+            (link_seq if tag.startswith("LINK_") else key_seq)[tag] = i
         lines.append({"seq": f"{i:06d}", **r})
-    return AuthResult(lines, key_seq, pairings)
+    return AuthResult(lines, key_seq, pairings, link_seq)
 
 
 def render_auth(ctx: GenContext, lines: list[dict[str, str]]) -> str:

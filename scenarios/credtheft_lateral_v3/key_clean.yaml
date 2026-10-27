@@ -1,4 +1,4 @@
-scenario_id: credtheft_lateral_v2
+scenario_id: credtheft_lateral_v3
 variant: clean
 seed: 20240312
 actions:
@@ -271,7 +271,7 @@ actions:
     - 409652
     synthetic_only: false
   - source_key: auth_srv_file_02
-    event_record_id: 125
+    event_record_id: 126
     event_id: null
     pairing_field: pipe_name
     pairing_value: svchost-MSEDGEWIN10-8116-stdin
@@ -280,7 +280,7 @@ actions:
     - 409650
     synthetic_only: false
   - source_key: auth_srv_file_02
-    event_record_id: 126
+    event_record_id: 127
     event_id: null
     pairing_field: pipe_name
     pairing_value: svchost-MSEDGEWIN10-8116-stdout
@@ -289,7 +289,7 @@ actions:
     - 409651
     synthetic_only: false
   - source_key: auth_srv_file_02
-    event_record_id: 124
+    event_record_id: 125
     event_id: null
     pairing_field: pipe_name
     pairing_value: svchost-MSEDGEWIN10-8116-stderr
@@ -394,14 +394,147 @@ missing_evidence:
   description: No memory image of WS-FIN-07 or DC-01 is available.
   confirms_claim: 'S1/S5: that credentials were actually extracted and which accounts were exposed'
 - id: GT-MIS-004
-  description: 'No network-logon evidence (Security 4624 type 3 / 5140 / 5145) and no ADMIN$ file copy
-    exist for the remote service creation on SRV-FILE-02: the real S3 file shows only the ntsvcs pipe,
-    an inbound TCP 445 connection and the service/PowerShell activity.'
-  confirms_claim: 'S3: which account authenticated, from which host, and that an admin share was used'
+  description: 'Real network-authentication evidence is still absent: no Security 4624 type 3 / 5140 /
+    5145 and no ADMIN$ file copy exist for the remote service creation on SRV-FILE-02, and the real S5
+    4662 events show no source address. The real S3 file shows only the ntsvcs pipe, an inbound TCP 445
+    connection and the service/PowerShell activity. The SYNTHETIC synth_only cross-host lines (CONN-001,
+    CONN-002) stand in for this evidence; they are not proof that it exists in the real captures.'
+  confirms_claim: 'S3/S5: which account authenticated, from which host, and that an admin share was used'
 generated_file_hashes:
-  auth_dc_01.log: a17f06eccaf45c56034132a2902ff838546d003f47637f320d2c2df81b22a3ed
-  auth_srv_file_02.log: 069cb1b196d6c2e9f832525f2b144146a60dc152e9e96d75a17e2f07b11d46c6
-  auth_ws_fin_07.log: beb18ef87a77a781524139a5aab9d7028cb8c33350cafa52c5cff3056037c15b
-  fs_dc_01.csv: 93150315eeb6260b94b5eae6c836a32c098e0b0573f304d8d2898fc6bcf675e3
-  fs_srv_file_02.csv: b6d689cd9200610fe28bddda6cda1b7bea72b6114d0ea17b996647a68c21dc43
-  fs_ws_fin_07.csv: eb74c5182656f9f93253fb98973fd419a3be423baa69e9a801cad2c9568405a3
+  auth_dc_01.log: 303e135c7099056b5ba3ac8d64f9771367544193fd39bf93a463493360a9f5d6
+  auth_srv_file_02.log: e4a901f9916e6118a0573f3779788985b6369bab40cf819ee07796aa4029a2f7
+  auth_ws_fin_07.log: eeb90366f72e34a59c8e128acac44832a3998acb70f2ad512a4c72d043d53b86
+  fs_dc_01.csv: 7baa16f79bfc803a42ecbc84d959f981715583e3aa05f37d2542964820eab965
+  fs_srv_file_02.csv: 0578a8f8cf53bbd4e037094ee5af8b3593e7aeab6cc67e9ea9ed15172e67998d
+  fs_ws_fin_07.csv: 3d57d37c52c59da1193e9fed545dafe6c789ecefad52c81e1ae7b6be3e6debc7
+links:
+- id: GT-LNK-001
+  from_host: WS-FIN-07
+  to_host: WS-FIN-07
+  kind: stage_continuation
+  basis: alignment_constructed
+  from_stage: S1
+  to_stage: S2
+  evidence_refs:
+  - source_key: s1_lsass_mimikatz
+    event_record_id: 4807
+    event_id: 10
+    pairing_field: null
+    pairing_value: null
+    paired_source_key: null
+    paired_record_ids: []
+    synthetic_only: false
+    conn_id: null
+  - source_key: s2_pth_logon
+    event_record_id: 432903
+    event_id: 4624
+    pairing_field: null
+    pairing_value: null
+    paired_source_key: null
+    paired_record_ids: []
+    synthetic_only: false
+    conn_id: null
+  real_evidence_note: S1 shows a process reading lsass.exe memory (Sysmon 10) but no account. S2 shows
+    a type 9 (new credentials) logon of user01 (Security 4624). Neither file refers to the other; the
+    connection between them is by time and host mapping only (the alignment layer maps both captures to
+    WS-FIN-07, S2 after S1).
+  expected_agent_statement: The LSASS read and the later new-credentials logon of user01 on WS-FIN-07
+    are plausibly one sequence, but only the host and time mapping links them; no record shows the logon
+    used the stolen secret.
+- id: GT-LNK-002
+  from_host: WS-FIN-07
+  to_host: SRV-FILE-02
+  kind: lateral_movement
+  basis: synthetic_only
+  from_stage: S2
+  to_stage: S3
+  evidence_refs:
+  - source_key: auth_ws_fin_07
+    event_record_id: 137
+    event_id: null
+    pairing_field: null
+    pairing_value: null
+    paired_source_key: null
+    paired_record_ids: []
+    synthetic_only: true
+    conn_id: CONN-001
+  - source_key: auth_srv_file_02
+    event_record_id: 120
+    event_id: null
+    pairing_field: null
+    pairing_value: null
+    paired_source_key: null
+    paired_record_ids: []
+    synthetic_only: true
+    conn_id: CONN-001
+  real_evidence_note: The real S3 file shows only an inbound TCP 445 connection (Sysmon 3) and the ntsvcs
+    pipe on SRV-FILE-02; it does not show which account connected or from which host. The real S2 file
+    shows the user01 logon on WS-FIN-07 only, a local logon. The only evidence of a connection from WS-FIN-07
+    to SRV-FILE-02 is the pair of SYNTHETIC synth_only lines with conn_id CONN-001.
+  expected_agent_statement: A SYNTHETIC SMB connection (CONN-001) and type 3 logon of user01 from WS-FIN-07
+    to SRV-FILE-02 is the only evidence of the hop; the real S3 file does not show the account or the
+    source host.
+- id: GT-LNK-003
+  from_host: SRV-FILE-02
+  to_host: SRV-FILE-02
+  kind: stage_continuation
+  basis: alignment_constructed
+  from_stage: S3
+  to_stage: S4
+  evidence_refs:
+  - source_key: s3_psexec_smb
+    event_record_id: 9804
+    event_id: 18
+    pairing_field: null
+    pairing_value: null
+    paired_source_key: null
+    paired_record_ids: []
+    synthetic_only: false
+    conn_id: null
+  - source_key: s4_renamed_psexec
+    event_record_id: 409645
+    event_id: 17
+    pairing_field: null
+    pairing_value: null
+    paired_source_key: null
+    paired_record_ids: []
+    synthetic_only: false
+    conn_id: null
+  real_evidence_note: S3 shows a new service launching a hidden PowerShell chain. S4 shows a svchost.exe
+    outside System32 creating PsExec-style named pipes. The two captures share no process, logon, pipe
+    or account; the alignment layer maps both to SRV-FILE-02 (S4 after S3), so continuity rests on host
+    and time mapping.
+  expected_agent_statement: The service-launched PowerShell (S3) and the renamed PsExec service pipes
+    (S4) on SRV-FILE-02 may belong to one intrusion, but only the host and time mapping connects them.
+- id: GT-LNK-004
+  from_host: SRV-FILE-02
+  to_host: DC-01
+  kind: remote_replication
+  basis: synthetic_only
+  from_stage: S4
+  to_stage: S5
+  evidence_refs:
+  - source_key: auth_srv_file_02
+    event_record_id: 157
+    event_id: null
+    pairing_field: null
+    pairing_value: null
+    paired_source_key: null
+    paired_record_ids: []
+    synthetic_only: true
+    conn_id: CONN-002
+  - source_key: auth_dc_01
+    event_record_id: 149
+    event_id: null
+    pairing_field: null
+    pairing_value: null
+    paired_source_key: null
+    paired_record_ids: []
+    synthetic_only: true
+    conn_id: CONN-002
+  real_evidence_note: The real S5 file shows Security 4662 directory-replication access on the domain
+    controller with an account and logon id but no source address or connection record; the real S4 file
+    is local to SRV-FILE-02. Nothing real shows that SRV-FILE-02 made the replication request. The connection
+    is shown only by SYNTHETIC synth_only lines with conn_id CONN-002.
+  expected_agent_statement: Only SYNTHETIC lines (CONN-002) place the replication request on SRV-FILE-02;
+    the real DCSync events do not show where the request came from.

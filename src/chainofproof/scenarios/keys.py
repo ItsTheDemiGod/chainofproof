@@ -11,6 +11,7 @@ from chainofproof.scenarios.gen_context import REAL_FMT, parse_real
 from chainofproof.scenarios.generator import GenResult
 from chainofproof.scenarios.inventory import Inventory, StageKeys
 from chainofproof.scenarios.keyevents import APPENDED, LOG_CLEARED_TECHNIQUE, KeyEvent
+from chainofproof.scenarios.keylinks import build_links
 from chainofproof.schemas.scenario import (
     AnswerKey,
     Confidence,
@@ -84,10 +85,13 @@ MISSING = [
         "S1/S5: that credentials were actually extracted and which accounts were exposed",
     ),
     (
-        "No network-logon evidence (Security 4624 type 3 / 5140 / 5145) and no ADMIN$ file copy "
-        "exist for the remote service creation on SRV-FILE-02: the real S3 file shows only the "
-        "ntsvcs pipe, an inbound TCP 445 connection and the service/PowerShell activity.",
-        "S3: which account authenticated, from which host, and that an admin share was used",
+        "Real network-authentication evidence is still absent: no Security 4624 type 3 / 5140 / "
+        "5145 and no ADMIN$ file copy exist for the remote service creation on SRV-FILE-02, and "
+        "the real S5 4662 events show no source address. The real S3 file shows only the ntsvcs "
+        "pipe, an inbound TCP 445 connection and the service/PowerShell activity. The SYNTHETIC "
+        "synth_only cross-host lines (CONN-001, CONN-002) stand in for this evidence; they are "
+        "not proof that it exists in the real captures.",
+        "S3/S5: which account authenticated, from which host, and that an admin share was used",
     ),
 ]
 
@@ -189,6 +193,7 @@ def build_key(scenario: Scenario, inv: Inventory, variant: Variant, gen: GenResu
         contradictions=gen.contradictions if variant == Variant.perturbed else [],
         decoys=decoys,
         injections=[],
+        links=build_links(scenario, inv, gen),
         missing_evidence=[
             GroundTruthMissingEvidence(id=f"GT-MIS-{i:03d}", description=d, confirms_claim=c)
             for i, (d, c) in enumerate(MISSING, 1)

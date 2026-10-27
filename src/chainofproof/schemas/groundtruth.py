@@ -15,11 +15,15 @@ from pydantic import Field, model_validator
 from chainofproof.schemas.common import (
     ACT_ID_PATTERN,
     CON_ID_PATTERN,
+    CONN_ID_PATTERN,
     DEC_ID_PATTERN,
     INJ_ID_PATTERN,
+    LNK_ID_PATTERN,
     MIS_ID_PATTERN,
     Confidence,
     ContradictionKind,
+    LinkBasis,
+    LinkKind,
     ScenarioError,
     SourceKey,
     SourceKind,
@@ -61,6 +65,42 @@ class SupportingRef(StrictModel):
     def is_paired(self) -> bool:
         """True when this synthetic ref is paired with real event(s)."""
         return self.pairing_field is not None
+
+
+class LinkRef(SupportingRef):
+    """A link reference: a real record, or a SYNTHETIC line with the ``conn_id`` it carries."""
+
+    conn_id: str | None = Field(default=None, pattern=CONN_ID_PATTERN)
+
+
+class GroundTruthLink(StrictModel):
+    """A link between two stages/hosts and exactly what the evidence does and does not show."""
+
+    id: str = Field(pattern=LNK_ID_PATTERN)
+    from_host: str
+    to_host: str
+    kind: LinkKind
+    basis: LinkBasis
+    from_stage: StageId
+    to_stage: StageId
+    evidence_refs: list[LinkRef]
+    real_evidence_note: str  # plain text: what the real files show and do NOT show
+    expected_agent_statement: str  # one sentence a careful agent should say
+
+    @model_validator(mode="after")
+    def _basis_matches_refs(self) -> GroundTruthLink:
+        refs = self.evidence_refs
+        if not refs:
+            raise ValueError(f"{self.id}: a link needs at least one evidence ref")
+        if self.basis == LinkBasis.synthetic_only:
+            conns = {r.conn_id for r in refs}
+            if not all(r.synthetic_only for r in refs) or None in conns or len(conns) != 1:
+                raise ValueError(
+                    f"{self.id}: synthetic_only link needs synthetic_only refs, one conn_id"
+                )
+        elif any(r.synthetic_only or r.conn_id for r in refs):
+            raise ValueError(f"{self.id}: alignment_constructed link must use real records only")
+        return self
 
 
 class GroundTruthAction(StrictModel):
@@ -129,6 +169,7 @@ class AnswerKey(StrictModel):
     injections: list[GroundTruthInjection]
     missing_evidence: list[GroundTruthMissingEvidence]
     generated_file_hashes: dict[str, str]  # published relative path -> sha256
+    links: list[GroundTruthLink] = []
 
     @model_validator(mode="after")
     def _unique_ids(self) -> AnswerKey:
@@ -138,6 +179,7 @@ class AnswerKey(StrictModel):
             self.decoys,
             self.injections,
             self.missing_evidence,
+            self.links,
         )
         ids = [x.id for group in groups for x in group]
         dup = sorted({i for i in ids if ids.count(i) > 1})
@@ -145,17 +187,17 @@ class AnswerKey(StrictModel):
             raise ValueError(f"duplicate ground-truth IDs: {dup}")
         return self
 
-    def _check_ref(self, a: GroundTruthAction, r: SupportingRef, scenario: Scenario) -> None:
+    def _check_ref(self, owner: str, r: SupportingRef, scenario: Scenario) -> None:
         kinds = {s.source_key: s.kind for s in scenario.sources}
         if r.source_key not in kinds:
-            raise ValueError(f"{a.id}: supporting_ref to undeclared source {r.source_key}")
+            raise ValueError(f"{owner}: supporting_ref to undeclared source {r.source_key}")
         if kinds[r.source_key] == SourceKind.real_evtx:
             if r.is_paired or r.synthetic_only:
-                raise ValueError(f"{a.id}: a ref to real source {r.source_key} carries pairing")
+                raise ValueError(f"{owner}: a ref to real source {r.source_key} carries pairing")
         elif not (r.is_paired or r.synthetic_only):
-            raise ValueError(f"{a.id}: synthetic ref {r.source_key}:{r.event_record_id} unpaired")
+            raise ValueError(f"{owner}: synthetic ref {r.source_key}:{r.event_record_id} unpaired")
         if r.paired_source_key and kinds.get(r.paired_source_key) != SourceKind.real_evtx:
-            raise ValueError(f"{a.id}: paired_source_key must be a declared real source")
+            raise ValueError(f"{owner}: paired_source_key must be a declared real source")
 
     def check_against(self, scenario: Scenario) -> None:
         """Raise ValueError unless every reference points at something the scenario declares."""
@@ -168,7 +210,15 @@ class AnswerKey(StrictModel):
             if a.stage_id not in stages or a.virtual_host not in hosts:
                 raise ValueError(f"{a.id}: unknown stage or host")
             for r in a.supporting_refs:
-                self._check_ref(a, r, scenario)
+                self._check_ref(a.id, r, scenario)
+        for ln in self.links:
+            if (
+                not {ln.from_host, ln.to_host} <= hosts
+                or not {ln.from_stage, ln.to_stage} <= stages
+            ):
+                raise ValueError(f"{ln.id}: unknown stage or host")
+            for r in ln.evidence_refs:
+                self._check_ref(ln.id, r, scenario)
         refs = [s for c in self.contradictions for s in c.sources_involved]
         refs += [d.source_key for d in self.decoys] + [i.source_key for i in self.injections]
         for k in refs:

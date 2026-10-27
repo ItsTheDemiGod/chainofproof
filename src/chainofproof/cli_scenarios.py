@@ -80,7 +80,11 @@ def key_tables(key: AnswerKey) -> list[Table]:
     mis = Table("id", "missing evidence", "would confirm")
     for m in key.missing_evidence:
         mis.add_row(m.id, m.description, m.confirms_claim)
-    return [act, con, dec, mis]
+    lnk = Table("id", "from", "to", "kind", "basis", "refs")
+    for k in key.links:
+        refs = ",".join(f"{r.source_key}:{r.event_record_id}" for r in k.evidence_refs)
+        lnk.add_row(k.id, k.from_host, k.to_host, k.kind.value, k.basis.value, refs)
+    return [act, con, dec, mis, lnk]
 
 
 def register(app: typer.Typer, handled: Callable[..., Any], out: Console, err: Console) -> None:

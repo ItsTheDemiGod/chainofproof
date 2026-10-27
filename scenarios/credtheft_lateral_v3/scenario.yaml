@@ -1,12 +1,15 @@
-scenario_id: credtheft_lateral_v2
+scenario_id: credtheft_lateral_v3
 title: Credential theft and lateral movement (composite)
 description: Independent real EVTX captures stitched into one storyline by an alignment layer (time offsets
   + host aliases), plus SYNTHETIC companion sources that are paired with real events or marked synthetic-only.
-  Two real captures from unrelated incidents are decoys.
-supersedes: credtheft_lateral_v1
-supersedes_reason: v1 synthetic companions put PsExec artifacts and an SMB admin-share line at stage S3, which
-  the real S3 file (a PowerShell stager started by a new service, no network logon, no ADMIN$ copy) does not
-  show; the keys also missed the real Security 1102 event and the P2 clock-skew pairing was undefined.
+  Two real captures from unrelated incidents are decoys. Cross-host links (WS-FIN-07 to SRV-FILE-02 to DC-01)
+  exist only as labeled SYNTHETIC lines (synth_only=1, shared conn_id) because the real captures tie no host
+  to another.
+supersedes: credtheft_lateral_v2
+supersedes_reason: v2 had no cross-host evidence at all (the real S2 logon is local, S3 shows an inbound TCP 445
+  connection with no account, S4 is local PsExec, the real DCSync events show no source address). v3 adds a few
+  labeled SYNTHETIC cross-host auth/connection lines (conn_id CONN-001 and CONN-002), the link ground truth
+  (GT-LNK) and two extra detection checks. v2 itself supersedes credtheft_lateral_v1 (see docs/decisions.md).
 dataset_provenance:
   repo_url: https://github.com/sbousseaden/EVTX-ATTACK-SAMPLES
   clone_commit: 4ceed2f4706daf601c212a8f91c113dd85349a2c

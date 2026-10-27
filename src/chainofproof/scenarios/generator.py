@@ -39,6 +39,7 @@ STOMPED_TAGS = ("renamed_svchost", "psexec_client")
 # check names that tests/oracles.py proves to work on the generated data
 CHECK_SI_FN, CHECK_PAIRED_DELTA = "si_fn_mismatch", "paired_line_time_delta"
 CHECK_SEQ_GAP, CHECK_REAL_IN_GAP = "seq_discontinuity", "real_events_inside_gap"
+CHECK_CROSS_PAIR, CHECK_UNMATCHED = "cross_host_pair_delta", "unmatched_connection"
 
 
 def slug(host: str) -> str:
@@ -54,6 +55,7 @@ class GenResult:
     fs_ids: dict[str, tuple[str, int]] = field(default_factory=dict)  # tag -> (source_key, id)
     auth_seq: dict[str, tuple[str, int]] = field(default_factory=dict)  # present lines only
     pairings: dict[str, Pairing] = field(default_factory=dict)  # tag -> pairing (fs and auth)
+    link_seq: dict[str, tuple[str, int]] = field(default_factory=dict)  # LINK_* tag, present only
     contradictions: list[GroundTruthContradiction] = field(default_factory=list)
 
 
@@ -105,8 +107,31 @@ def _timestomp(ctx: GenContext, fs: FsResult, host: str) -> GroundTruthContradic
     )
 
 
-def _skew(ctx: GenContext, auth: AuthResult, host: str) -> GroundTruthContradiction:
+def _line_at(auth: AuthResult, tag: str) -> dict[str, str]:
+    """The line of an auth log that carries a link tag (looked up by its seq)."""
+    seq = auth.link_seq[tag]
+    return next(ln for ln in auth.lines if int(ln["seq"]) == seq)
+
+
+def _cross_pair(src: AuthResult, dst: AuthResult, dst_shift: int) -> dict:
+    """LINK-A: both ends of CONN-001 and their time difference (destination minus source)."""
+    s, d = _line_at(src, "LINK_A:src"), _line_at(dst, "LINK_A:dst")
+    assert s["conn_id"] == d["conn_id"]
+    delta = int((parse_ts(d["ts"]) - parse_ts(s["ts"])).total_seconds())
+    return {
+        "conn_id": s["conn_id"],
+        "source_side": {"source_key": f"auth_{slug(s['host'])}", "seq": int(s["seq"])},
+        "dest_side": {"source_key": f"auth_{slug(d['host'])}", "seq": int(d["seq"])},
+        "clean_delta_seconds": delta,
+        "perturbed_delta_seconds": delta + dst_shift,
+    }
+
+
+def _skew(
+    ctx: GenContext, auth: AuthResult, host: str, all_auth: dict[str, AuthResult]
+) -> GroundTruthContradiction:
     sk, paired = f"auth_{slug(host)}", []
+    cross = _cross_pair(all_auth["WS-FIN-07"], auth, SKEW_SECONDS)
     by_seq = {int(ln["seq"]): ln for ln in auth.lines}
     for tag, seq in sorted(auth.key_seq.items(), key=lambda kv: kv[1]):
         pr = auth.pairings[tag]
@@ -130,7 +155,10 @@ def _skew(ctx: GenContext, auth: AuthResult, host: str) -> GroundTruthContradict
         id="GT-CON-002",
         kind=ContradictionKind.clock_skew,
         sources_involved=[sk, _src(ctx, "S4")],
-        description=f"Every auth-log line of {host} is {SKEW_SECONDS} s later than reality.",
+        description=(
+            f"Every auth-log line of {host} ({len(auth.lines)} lines, including the synthetic "
+            f"cross-host link lines) is {SKEW_SECONDS} s later than reality."
+        ),
         magnitude=SKEW_SECONDS,
         magnitude_unit="seconds",
         params={
@@ -139,18 +167,37 @@ def _skew(ctx: GenContext, auth: AuthResult, host: str) -> GroundTruthContradict
             "shift_seconds": SKEW_SECONDS,
             "lines_shifted": len(auth.lines),
             "paired_lines": paired,
+            "cross_host_pairs": [cross],
         },
         detectable_by=(
             "paired lines: each NAMED_PIPE_OPEN line carries pair=pipe_name:<name>, the pipe name "
             "of a real S4 Sysmon 18 event; after the alignment layer the line time minus the real "
             "event time (whole seconds) is 0 s in the clean variant and +420 s in the perturbed "
-            "variant for every paired line"
+            "variant for every paired line. cross_host_pair_delta: the two ends of CONN-001 "
+            "(WS-FIN-07 CONN_OUT, SRV-FILE-02 LOGON_SUCCESS, same conn_id) differ by exactly 0 s "
+            "in the clean variant and +420 s in the perturbed variant; this compares SYNTHETIC "
+            "with SYNTHETIC lines, no real event is involved"
         ),
-        checks=[CHECK_PAIRED_DELTA],
+        checks=[CHECK_PAIRED_DELTA, CHECK_CROSS_PAIR],
     )
 
 
-def _gap(ctx: GenContext, auth: AuthResult, host: str) -> GroundTruthContradiction:
+def _unmatched(gone: list[dict[str, str]], srv: AuthResult) -> dict:
+    """LINK-B: CONN-002's DC-01 end was removed in the window; its SRV-FILE-02 end remains."""
+    src = _line_at(srv, "LINK_B:src")
+    lost = [ln for ln in gone if ln.get("conn_id") == src["conn_id"]]
+    assert len(lost) == 1  # the destination-side line must be inside the removed window
+    return {
+        "conn_id": src["conn_id"],
+        "present_side": "source",
+        "present": {"source_key": f"auth_{slug(src['host'])}", "seq": int(src["seq"])},
+        "missing": {"source_key": f"auth_{slug(lost[0]['host'])}", "seq": int(lost[0]["seq"])},
+    }
+
+
+def _gap(
+    ctx: GenContext, auth: AuthResult, host: str, all_auth: dict[str, AuthResult]
+) -> GroundTruthContradiction:
     key_ts = parse_ts(next(ln["ts"] for ln in auth.lines if ln["event"].startswith("DIRECTORY")))
     lo = key_ts - GAP_BEFORE
     hi = lo + GAP_LENGTH
@@ -166,8 +213,9 @@ def _gap(ctx: GenContext, auth: AuthResult, host: str) -> GroundTruthContradicti
         kind=ContradictionKind.log_gap,
         sources_involved=[sk, s5.source_key],
         description=(
-            f"All {host} auth-log lines in a 12-minute window containing the DCSync event are "
-            "missing; seq jumps over the window."
+            f"All {len(gone)} {host} auth-log lines in a 12-minute window containing the DCSync "
+            f"event are missing (seq {min(seqs)} to {max(seqs)}), among them the destination-side "
+            "line of the synthetic connection CONN-002; seq jumps over the window."
         ),
         magnitude=int(GAP_LENGTH.total_seconds()),
         magnitude_unit="seconds",
@@ -181,12 +229,16 @@ def _gap(ctx: GenContext, auth: AuthResult, host: str) -> GroundTruthContradicti
             "last_removed_seq": max(seqs),
             "real_source_key": s5.source_key,
             "real_record_ids_inside_window": inside,
+            "unmatched_connections": [_unmatched(gone, all_auth["SRV-FILE-02"])],
         },
         detectable_by=(
             "seq discontinuity in the DC-01 auth log, plus real S5 4662 events (record ids in "
-            "real_record_ids_inside_window) whose aligned time falls inside the missing window"
+            "real_record_ids_inside_window) whose aligned time falls inside the missing window. "
+            "unmatched_connection: the SRV-FILE-02 source-side line of CONN-002 has no "
+            "destination-side counterpart on DC-01 (removed in the window); in the clean variant "
+            "every conn_id has both ends"
         ),
-        checks=[CHECK_SEQ_GAP, CHECK_REAL_IN_GAP],
+        checks=[CHECK_SEQ_GAP, CHECK_REAL_IN_GAP, CHECK_UNMATCHED],
     )
 
 
@@ -197,19 +249,21 @@ def generate_variant(
     ctx = GenContext(scenario, inventory)
     texts: dict[str, str] = {}
     res = GenResult(hashes={})
+    all_auth = {h: generate_auth(ctx, h) for h in HOSTS}  # all hosts first: links span hosts
     for host in HOSTS:
-        fs, auth = generate_fs(ctx, host), generate_auth(ctx, host)
+        fs, auth = generate_fs(ctx, host), all_auth[host]
         fsk, auk = f"fs_{slug(host)}", f"auth_{slug(host)}"
         if variant == Variant.perturbed:
             if host == "SRV-FILE-02":
                 res.contradictions.append(_timestomp(ctx, fs, host))
-                res.contradictions.append(_skew(ctx, auth, host))
+                res.contradictions.append(_skew(ctx, auth, host, all_auth))
             if host == "DC-01":
-                res.contradictions.append(_gap(ctx, auth, host))
+                res.contradictions.append(_gap(ctx, auth, host, all_auth))
         texts[scenario.source(fsk).relative_path] = render_fs(ctx, fs.rows)
         texts[scenario.source(auk).relative_path] = render_auth(ctx, auth.lines)
         res.fs_ids.update({t: (fsk, i) for t, i in fs.artifacts.items()})
         res.auth_seq.update({t: (auk, s) for t, s in auth.key_seq.items() if _present(auth, s)})
+        res.link_seq.update({t: (auk, s) for t, s in auth.link_seq.items() if _present(auth, s)})
         res.pairings.update(fs.pairings)
         res.pairings.update(auth.pairings)
     res.contradictions.sort(key=lambda c: c.id)

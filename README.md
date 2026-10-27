@@ -43,6 +43,9 @@ Set `CHAINOFPROOF_BASE_DIR` to use a throwaway data root instead of `data/`.
 | `scenario-verify SCENARIO_ID` | dataset hashes, alignment, keys, generator determinism, adjudication list (exit 0/1) |
 | `scenario-key-show SCENARIO_ID clean\|perturbed` | answer key as tables |
 
-Datasets live in `data/downloads/` (gitignored); see `docs/scenarios.md`.
+Datasets live in `data/downloads/` (gitignored); see `docs/scenarios.md`. The current scenario is
+`credtheft_lateral_v3`: real EVTX captures plus labeled SYNTHETIC companions, including a few
+`synth_only` cross-host connection lines (`conn_id`) and the link ground truth (`GT-LNK`); see
+"Cross-host links" in `docs/scenarios.md`.
 
 Tamper demo (temp dir only): `.venv\Scripts\python.exe scripts\demo_tamper.py`
