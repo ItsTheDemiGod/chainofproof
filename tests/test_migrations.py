@@ -3,7 +3,7 @@ from contextlib import closing
 
 from chainofproof.custody.hashing import sha256_file
 from chainofproof.custody.ledger import Ledger
-from chainofproof.custody.migrations import migrate_to_v2, schema_version
+from chainofproof.custody.migrations import migrate_to_v2, migrate_to_v3, schema_version
 from chainofproof.ingest.store import SCHEMA, EvidenceStore
 
 
@@ -62,11 +62,43 @@ def test_migration_is_idempotent_and_v2_is_left_alone(paths):
     assert len(list((paths.db_dir / "backups").iterdir())) == 1
 
 
-def test_fresh_database_is_created_at_v2_and_not_migrated(paths):
+V3_TABLES = {"detector_runs", "detector_hits", "graph_runs"}
+
+
+def test_v2_to_v3_keeps_data_is_idempotent_and_v3_left_alone(paths):
+    make_v1(paths)
+    migrate_to_v2(paths)
+    n = len(Ledger(paths).read_all())
+    m = migrate_to_v3(paths)
+    assert m.migrated and (m.from_version, m.to_version) == (2, 3)
+    assert m.backup_name == "chainofproof.db.pre-v3"
+    backup = paths.db_dir / "backups" / m.backup_name
+    assert sha256_file(backup) == m.backup_sha256
+    assert V3_TABLES <= tables(paths)
+    with closing(sqlite3.connect(paths.db_path)) as con:
+        assert schema_version(con) == 3
+        assert con.execute("SELECT COUNT(*) FROM evidence").fetchone()[0] == 1
+    last = Ledger(paths).read_all()[-1]
+    assert last.action == "db_migrate" and last.details["to_version"] == 3
+    assert len(Ledger(paths).read_all()) == n + 1
+    assert not migrate_to_v3(paths).migrated and len(Ledger(paths).read_all()) == n + 1
+    assert Ledger(paths).verify().ok
+
+
+def test_v1_passes_through_v2_to_v3(paths):
+    make_v1(paths)
+    m = migrate_to_v3(paths)
+    assert (m.from_version, m.to_version) == (2, 3)
+    names = sorted(p.name for p in (paths.db_dir / "backups").iterdir())
+    assert names == ["chainofproof.db.pre-v2", "chainofproof.db.pre-v3"]
+
+
+def test_fresh_database_is_created_at_latest_version_and_not_migrated(paths):
     EvidenceStore(paths)
     with closing(sqlite3.connect(paths.db_path)) as con:
-        assert schema_version(con) == 2
-    assert not migrate_to_v2(paths).migrated
+        assert schema_version(con) == 3
+    assert V3_TABLES <= tables(paths)
+    assert not migrate_to_v2(paths).migrated and not migrate_to_v3(paths).migrated
     assert not (paths.db_dir / "backups").exists()
 
 

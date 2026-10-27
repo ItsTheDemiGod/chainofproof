@@ -73,3 +73,33 @@ def scan(paths, case_id, source_keys, min_ts=None) -> LeakReport:
         if hits and len(rep.samples) < 3:
             rep.samples.append(f"{row['event_type']}/{row['source_kind']}")
     return rep
+
+
+TS_KEYS = ("timestamp", "_ts", "first_seen", "last_seen", "present_time", "time_from", "time_to")
+ISO = re.compile(r"^\d{4}-\d{2}-\d{2}T")
+
+
+def scan_tool_output(obj, names, source_keys, floor="2021-01-01") -> list[str]:
+    """Strict leakage scan of one serialized tool result (any depth).
+
+    Fails on ground-truth hints, original/vault file names and source keys ANYWHERE; on real
+    computer names in host-like values; and on structured timestamps before ``floor``.
+    """
+    blob = json.dumps(obj, ensure_ascii=False)
+    out = [f"contains {n!r}" for n in [*HINTS, *names, *source_keys] if n and n in blob]
+
+    def walk(o, key=""):
+        if isinstance(o, dict):
+            for k, v in o.items():
+                walk(v, k)
+        elif isinstance(o, list):
+            for v in o:
+                walk(v, key)
+        elif isinstance(o, str):
+            if "host" in key and any(c.lower() in o.lower() for c in REAL_COMPUTERS):
+                out.append(f"{key} has a real computer name")
+            if any(key.endswith(s) or key == s for s in TS_KEYS) and ISO.match(o) and o < floor:
+                out.append(f"{key}={o} looks real")
+
+    walk(obj)
+    return out

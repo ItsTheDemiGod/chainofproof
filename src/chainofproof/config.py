@@ -66,6 +66,46 @@ class ToolsSettings(BaseModel):
     exe_glob: str = "hayabusa*.exe"  # tests point this at a fake executable
 
 
+class TimestompParams(BaseModel):
+    """timestomp detector parameters."""
+
+    min_delta_seconds: float = 3600
+
+
+class ClockSkewParams(BaseModel):
+    """clock_skew detector parameters."""
+
+    min_abs_delta_seconds: float = 2.0
+    min_independent_pairs: int = 2
+    agreement_seconds: float = 1.0
+
+
+class LogGapParams(BaseModel):
+    """log_gap detector parameters."""
+
+    max_other_events_listed: int = 10
+
+
+class LogClearParams(BaseModel):
+    """log_clear detector parameters."""
+
+    window_seconds: float = 60
+
+
+class UnmatchedConnectionParams(BaseModel):
+    """unmatched_connection detector parameters (none)."""
+
+
+class DetectorSettings(BaseModel):
+    """Defaults of every detector (section ``detectors`` of settings.yaml)."""
+
+    timestomp: TimestompParams = TimestompParams()
+    clock_skew: ClockSkewParams = ClockSkewParams()
+    log_gap: LogGapParams = LogGapParams()
+    log_clear: LogClearParams = LogClearParams()
+    unmatched_connection: UnmatchedConnectionParams = UnmatchedConnectionParams()
+
+
 class CloudSettings(BaseModel):
     enabled: bool = False
     provider: str = "none"
@@ -78,6 +118,7 @@ class Settings(BaseModel):
     ollama: OllamaSettings
     paths: PathSettings
     tools: ToolsSettings = ToolsSettings()
+    detectors: DetectorSettings = DetectorSettings()
     optional_cloud: CloudSettings = CloudSettings()
     project_root: Path = PROJECT_ROOT
 

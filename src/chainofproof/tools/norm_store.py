@@ -13,7 +13,7 @@ from collections.abc import Sequence
 from chainofproof.config import Paths
 from chainofproof.custody.db import connect
 from chainofproof.custody.hashing import iso_utc, utc_now
-from chainofproof.custody.migrations import SCHEMA_VERSION, schema_version
+from chainofproof.custody.migrations import schema_version
 from chainofproof.errors import UserError
 from chainofproof.schemas.events import Detection, NormalizedEvent
 
@@ -36,15 +36,20 @@ class SchemaVersionError(UserError):
     """The database is older than this code expects."""
 
 
-def require_v2(paths: Paths) -> None:
-    """Raise unless the database is at schema version 2 (run ``db-migrate`` otherwise)."""
+def require_version(paths: Paths, minimum: int) -> None:
+    """Raise unless the database is at schema version >= ``minimum`` (run ``db-migrate``)."""
     conn = connect(paths.db_path)
     try:
         v = schema_version(conn)
     finally:
         conn.close()
-    if v is None or v < SCHEMA_VERSION:
+    if v is None or v < minimum:
         raise SchemaVersionError(f"database is at schema version {v}; run db-migrate first")
+
+
+def require_v2(paths: Paths) -> None:
+    """Raise unless the database has the normalized-event tables (version >= 2)."""
+    require_version(paths, 2)
 
 
 def insert_run(

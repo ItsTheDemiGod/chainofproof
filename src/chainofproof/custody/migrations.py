@@ -1,7 +1,8 @@
-"""Explicit, safe database migrations (schema version 1 -> 2).
+"""Explicit, safe database migrations (schema versions 1 -> 2 -> 3).
 
-Version 2 adds the normalized-event tables. Fresh databases are created at version 2 directly; an
-existing version-1 database is changed only by ``migrate_to_v2``: backup with the sqlite3 backup
+Version 2 adds the normalized-event tables, version 3 the graph and detector tables. Fresh
+databases are created at the latest version directly; an existing older database is changed only
+by ``migrate_to_v2`` / ``migrate_to_v3``: backup with the sqlite3 backup
 API (the database is in WAL mode, so a raw file copy would be unsafe), one transaction, then a
 ``db_migrate`` ledger entry. Nothing is ever dropped or deleted.
 """
@@ -9,6 +10,7 @@ API (the database is in WAL mode, so a raw file copy would be unsafe), one trans
 from __future__ import annotations
 
 import sqlite3
+from collections.abc import Callable
 from contextlib import closing
 from dataclasses import dataclass
 from pathlib import Path
@@ -18,8 +20,7 @@ from chainofproof.custody.db import connect
 from chainofproof.custody.hashing import sha256_file
 from chainofproof.custody.ledger import Ledger
 
-SCHEMA_VERSION = 2
-BACKUP_NAME = "chainofproof.db.pre-v2"
+SCHEMA_VERSION = 3
 
 V2_DDL = [
     """CREATE TABLE IF NOT EXISTS norm_runs (
@@ -87,9 +88,55 @@ V2_DDL = [
 ]
 
 
+V3_DDL = [
+    """CREATE TABLE IF NOT EXISTS detector_runs (
+        run_id TEXT PRIMARY KEY,
+        case_id TEXT NOT NULL REFERENCES cases(case_id),
+        detector TEXT NOT NULL,
+        params_json TEXT NOT NULL,
+        params_sha256 TEXT NOT NULL,
+        input_sha256 TEXT NOT NULL,
+        hit_count INTEGER NOT NULL,
+        output_sha256 TEXT NOT NULL,
+        ledger_id TEXT NOT NULL,
+        created_at TEXT NOT NULL)""",
+    """CREATE TABLE IF NOT EXISTS detector_hits (
+        hit_id TEXT PRIMARY KEY,
+        run_id TEXT NOT NULL REFERENCES detector_runs(run_id),
+        case_id TEXT NOT NULL,
+        hit_key TEXT NOT NULL,
+        detector TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        severity TEXT NOT NULL,
+        hosts TEXT NOT NULL,
+        evidence_labels TEXT NOT NULL,
+        event_uids TEXT NOT NULL,
+        measures TEXT NOT NULL,
+        explanation TEXT NOT NULL,
+        limitations TEXT NOT NULL,
+        created_at TEXT NOT NULL)""",
+    "CREATE INDEX IF NOT EXISTS ix_hits_case_det ON detector_hits(case_id, detector)",
+    "CREATE INDEX IF NOT EXISTS ix_hits_key ON detector_hits(hit_key)",
+    """CREATE TABLE IF NOT EXISTS graph_runs (
+        run_id TEXT PRIMARY KEY,
+        case_id TEXT NOT NULL REFERENCES cases(case_id),
+        node_count INTEGER NOT NULL,
+        edge_count INTEGER NOT NULL,
+        graph_sha256 TEXT NOT NULL,
+        ledger_id TEXT NOT NULL,
+        created_at TEXT NOT NULL)""",
+]
+
+
 def create_v2_tables(conn: sqlite3.Connection) -> None:
     """Create the version-2 tables (idempotent)."""
     for ddl in V2_DDL:
+        conn.execute(ddl)
+
+
+def create_v3_tables(conn: sqlite3.Connection) -> None:
+    """Create the version-3 tables (idempotent)."""
+    for ddl in V3_DDL:
         conn.execute(ddl)
 
 
@@ -113,13 +160,14 @@ class MigrationResult:
     backup_sha256: str | None = None
 
 
-def _backup_path(db_dir: Path) -> Path:
+def _backup_path(db_dir: Path, target: int) -> Path:
     folder = db_dir / "backups"
     folder.mkdir(parents=True, exist_ok=True)
-    p, n = folder / BACKUP_NAME, 1
+    name = f"chainofproof.db.pre-v{target}"
+    p, n = folder / name, 1
     while p.exists():  # never overwrite an earlier backup
         n += 1
-        p = folder / f"{BACKUP_NAME}.{n}"
+        p = folder / f"{name}.{n}"
     return p
 
 
@@ -129,18 +177,20 @@ def _backup(conn: sqlite3.Connection, dest: Path) -> str:
     return sha256_file(dest)
 
 
-def migrate_to_v2(paths: Paths) -> MigrationResult:
-    """Bring the database to schema version 2 (no-op when it already is)."""
+def _step(
+    paths: Paths, target: int, create: Callable[[sqlite3.Connection], None]
+) -> MigrationResult:
+    """Migrate from ``target - 1`` to ``target``: backup, one transaction, ledger entry."""
     with closing(connect(paths.db_path)) as conn:
         current = schema_version(conn)
-        if current is None or current >= SCHEMA_VERSION:
-            return MigrationResult(current or SCHEMA_VERSION, SCHEMA_VERSION, False)
-        dest = _backup_path(paths.db_dir)
+        if current is None or current >= target:
+            return MigrationResult(current or target, target, False)
+        dest = _backup_path(paths.db_dir, target)
         digest = _backup(conn, dest)
         conn.execute("BEGIN IMMEDIATE")
         try:
-            create_v2_tables(conn)
-            conn.execute("UPDATE schema_version SET version = ?", (SCHEMA_VERSION,))
+            create(conn)
+            conn.execute("UPDATE schema_version SET version = ?", (target,))
         except BaseException:
             conn.execute("ROLLBACK")
             raise
@@ -150,9 +200,20 @@ def migrate_to_v2(paths: Paths) -> MigrationResult:
         "db_migrate",
         details={
             "from_version": current,
-            "to_version": SCHEMA_VERSION,
+            "to_version": target,
             "backup_file": dest.name,
             "backup_sha256": digest,
         },
     )
-    return MigrationResult(current, SCHEMA_VERSION, True, dest.name, digest)
+    return MigrationResult(current, target, True, dest.name, digest)
+
+
+def migrate_to_v2(paths: Paths) -> MigrationResult:
+    """Bring a version-1 database to schema version 2 (no-op when it is already >= 2)."""
+    return _step(paths, 2, create_v2_tables)
+
+
+def migrate_to_v3(paths: Paths) -> MigrationResult:
+    """Bring the database to schema version 3 (v1 databases pass through v2 first)."""
+    migrate_to_v2(paths)
+    return _step(paths, 3, create_v3_tables)

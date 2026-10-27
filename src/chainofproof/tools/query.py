@@ -102,6 +102,9 @@ def _event(row: sqlite3.Row) -> NormalizedEvent:
     return NormalizedEvent(**d)
 
 
+event_from_row = _event  # public alias for the loader
+
+
 def _page(conn: sqlite3.Connection, where: str, args: list, limit: int, offset: int = 0):
     base = f"FROM events e WHERE e.norm_run_id IN ({LATEST_RUNS}) AND {where}"
     total = conn.execute(f"SELECT COUNT(*) {base}", args).fetchone()[0]  # noqa: S608 - fixed text

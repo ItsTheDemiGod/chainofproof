@@ -14,7 +14,7 @@ from rich.console import Console
 from rich.logging import RichHandler
 from rich.table import Table
 
-from chainofproof import cli_scenarios, cli_tools
+from chainofproof import cli_graph, cli_scenarios, cli_tools
 from chainofproof.config import Paths, get_paths
 from chainofproof.custody.ledger import Ledger
 from chainofproof.errors import UserError
@@ -221,3 +221,4 @@ def ledger_head(ctx: typer.Context) -> None:
 
 cli_scenarios.register(app, _handled, out, err)
 cli_tools.register(app, _handled, out, err)
+cli_graph.register(app, _handled, out, err)

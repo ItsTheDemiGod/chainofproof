@@ -11,7 +11,11 @@ from chainofproof.config import Paths
 from chainofproof.custody.db import connect
 from chainofproof.custody.hashing import iso_utc, utc_now
 from chainofproof.custody.ledger import Ledger
-from chainofproof.custody.migrations import SCHEMA_VERSION, create_v2_tables
+from chainofproof.custody.migrations import (
+    SCHEMA_VERSION,
+    create_v2_tables,
+    create_v3_tables,
+)
 from chainofproof.errors import UserError
 from chainofproof.schemas.custody import (
     CASE_ID_PATTERN,
@@ -76,6 +80,7 @@ class EvidenceStore:
                 conn.execute(ddl)
             if conn.execute("SELECT 1 FROM schema_version").fetchone() is None:
                 create_v2_tables(conn)
+                create_v3_tables(conn)
                 conn.execute("INSERT INTO schema_version(version) VALUES (?)", (SCHEMA_VERSION,))
 
     # ---- cases ---------------------------------------------------------------------------

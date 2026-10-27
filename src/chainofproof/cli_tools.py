@@ -16,7 +16,7 @@ from rich.console import Console
 from rich.table import Table
 
 from chainofproof.config import Paths, load_settings
-from chainofproof.custody.migrations import migrate_to_v2
+from chainofproof.custody.migrations import migrate_to_v3
 from chainofproof.eval.baseline import compute_baseline, totals_by_level, write_markdown
 from chainofproof.eval.coverage import run_coverage
 from chainofproof.tools import query
@@ -61,11 +61,11 @@ def register(app: typer.Typer, handled: Callable[..., Any], out: Console, err: C
     @app.command("db-migrate")
     @handled
     def db_migrate(ctx: typer.Context) -> None:
-        """Migrate the database to schema version 2 (backup first; no-op if already v2)."""
+        """Migrate the database to the latest schema version (backup first; no-op if current)."""
         _migrate(paths_of(ctx))
 
     def _migrate(paths: Paths) -> None:
-        m = migrate_to_v2(paths)
+        m = migrate_to_v3(paths)
         if m.migrated:
             out.print(f"migrated v{m.from_version} -> v{m.to_version}; backup {m.backup_name} "
                       f"(sha256 {(m.backup_sha256 or '')[:16]}...)", highlight=False)  # fmt: skip

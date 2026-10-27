@@ -88,3 +88,44 @@ def test_no_leakage_in_real_agent_view_dump(real, variant):
     assert rep.strict == [], rep.strict[:5]
     print(f"\n{variant.value}: free-text real-computer-name hits={rep.free_text_computer_names} "
           f"old-date hits={rep.free_text_old_dates} samples={rep.samples}")  # fmt: skip
+
+
+@pytest.mark.parametrize("variant", list(Variant))
+def test_every_registered_tool_is_leak_free_on_the_real_cases(real, variant):
+    import json
+
+    from chainofproof.scenarios.source_map import load_case_scenario
+    from chainofproof.tools.detectors import DETECTORS
+    from chainofproof.tools.registry import call_tool
+    from leakage import scan_tool_output
+
+    paths, _ = real
+    case = f"{SID}_{variant.value}"
+    scn, _ = load_case_scenario(case)
+    names = []
+    for rec in EvidenceStore(paths).list_evidence(case):
+        names += [rec.original_name, rec.vault_path.replace("\\", "/").rsplit("/", 1)[-1]]
+    keys = [s.source_key for s in scn.sources]
+    labels = call_tool("planner", "list_evidence_labels", {}, paths, case)["labels"]
+    page = call_tool("extractor", "search_events", {"limit": 50}, paths, case)
+    uid = page["events"][0]["event_uid"]
+    calls = [
+        ("planner", "list_evidence_labels", {}),
+        ("planner", "source_summary", {"evidence_label": labels[0]["label"]}),
+        ("planner", "graph_stats", {}),
+        ("extractor", "search_events", {"limit": 50}),
+        ("extractor", "get_event", {"event_uid": uid}),
+        ("extractor", "timeline_window", {"host": "DC-01", "start": "2024-03-12T00:00:00Z",
+                                          "end": "2024-03-12T23:59:59Z"}),
+        ("extractor", "get_detections", {"limit": 50}),
+        ("correlator", "entity_summary", {"node_id": "host:SRV-FILE-02"}),
+        ("correlator", "neighbors", {"node_id": "host:SRV-FILE-02", "limit": 50}),
+        ("correlator", "find_paths", {"from_node": "host:WS-FIN-07", "to_node": "host:DC-01"}),
+        ("correlator", "host_links", {}),
+        *[("correlator", f"detect_{n}", {}) for n in DETECTORS],
+        ("reporter", "get_hits", {"limit": 50}),
+    ]  # fmt: skip
+    for role, tool, args in calls:
+        result = call_tool(role, tool, args, paths, case)
+        assert json.dumps(result)
+        assert scan_tool_output(result, names, keys) == [], tool

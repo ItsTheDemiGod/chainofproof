@@ -98,8 +98,9 @@ FORBIDDEN = re.compile(
 
 
 def agent_side_files():
-    files = [SRC / "tools" / "query.py"]
-    for pkg in ("agents", "report", "ui", "llm", "security"):
+    tools = ("query", "graph_query", "registry", "loader")
+    files = [SRC / "tools" / f"{n}.py" for n in tools]
+    for pkg in ("agents", "report", "ui", "llm", "security", "graph", "tools/detectors"):
         files += sorted((SRC / pkg).rglob("*.py")) if (SRC / pkg).is_dir() else []
     return files
 
@@ -109,9 +110,19 @@ def test_agent_side_source_has_no_forbidden_imports(path):
     assert FORBIDDEN.findall(path.read_text(encoding="utf-8")) == []
 
 
-def test_query_module_does_not_load_eval_or_scenarios_at_import_time():
+@pytest.mark.parametrize(
+    "module",
+    [
+        "chainofproof.tools.query",
+        "chainofproof.tools.graph_query",
+        "chainofproof.tools.registry",
+        "chainofproof.tools.detectors",
+        "chainofproof.graph.builder",
+    ],
+)
+def test_agent_modules_do_not_load_eval_or_scenarios_at_import_time(module):
     code = (
-        "import sys, chainofproof.tools.query; "
+        f"import sys, {module}; "
         "pre = ('chainofproof.eval', 'chainofproof.scenarios'); "
         "bad = [m for m in sys.modules if m.startswith(pre)]; "
         "print(json.dumps(bad))"

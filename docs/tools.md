@@ -56,3 +56,26 @@ tools_bin/hayabusa/hayabusa-4.2.0-win-x64.exe dfir-timeline -f <working copy> -o
 ```
 
 `normalize` first migrates the database to schema version 2 if needed (online backup into `data/db/backups/`, then one transaction). A rerun never deletes anything: it adds a new normalization run and queries use the latest completed run per evidence.
+
+## Tool registry and roles (Phase 4)
+
+`tools/registry.py` registers every agent-facing tool with a pydantic argument model (unknown
+arguments are rejected), a returns model, the roles allowed to call it, and a JSON schema
+(`export_schemas()`, for Phase 5 tool calling). `call_tool(role, name, args, paths, case_id)` validates
+the arguments, enforces the role, bounds the output (items capped at 50, 200 000 characters in total)
+and returns a JSON-serializable dict. No LLM is involved.
+
+| tool | what it does | roles |
+|---|---|---|
+| list_evidence_labels, source_summary | sources and per-source counts | planner, extractor |
+| search_events, timeline_window, get_event, get_detections | event queries (get_detections: extractor only) | extractor; search_events/get_event also correlator, skeptic; get_event also reporter; timeline_window also skeptic |
+| graph_stats | counts and IP resolution | planner, correlator, skeptic |
+| entity_summary, neighbors, find_paths | graph reads | correlator, skeptic |
+| host_links | host-to-host links with conn ids | correlator, skeptic, reporter |
+| detect_timestomp, detect_clock_skew, detect_log_gap, detect_log_clear, detect_unmatched_connection | one detector each, explicit parameters | correlator, skeptic |
+| get_hits | stored hits (latest run per detector) or one by id | planner, correlator, skeptic, reporter |
+
+Detector tools record a run (ledger entry, `detector_runs`, `detector_hits`) but never alter evidence.
+Citation ids for later phases: `EVT-<12hex>` for events and `HIT-######` for detector hits.
+New CLI: `graph-build`, `graph-show`, `detect`, `detect-all` (humans and eval only), `hits-show`,
+`eval-detectors` and `style-audit` (EVAL ONLY).

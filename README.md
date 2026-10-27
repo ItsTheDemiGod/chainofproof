@@ -6,7 +6,7 @@ where every claim cites evidence IDs. Fully local (Ollama), free, reproducible.
 See `CLAUDE.md` for principles, architecture and phases.
 
 ## Status
-Phases 0 to 3 done (ingestion and custody, datasets and answer keys, cross-host links, forensic tool layer with normalized events). Next: Phase 4 (evidence graph and contradiction detection). See `docs/tools.md`.
+Phases 0 to 4 done (ingestion and custody, datasets and answer keys, cross-host links, forensic tool layer, evidence graph and five contradiction detectors with a tool registry). Next: Phase 5 (agent core). See `docs/tools.md`, `docs/graph.md`, `docs/detectors.md`.
 
 ## Setup (Windows, PowerShell)
 ```powershell
@@ -48,6 +48,11 @@ Set `CHAINOFPROOF_BASE_DIR` to use a throwaway data root instead of `data/`.
 | `normalize CASE_ID [--evidence EV-ID]` | migrate if needed, normalize all evidence (agent view + eval layer) and run Hayabusa on every EVTX |
 | `events-stats CASE_ID` | per-source counts and event types (agent view only) |
 | `events-show CASE_ID [--host H] [--type T] [--limit N]` | normalized events (agent view only, max 50) |
+| `graph-build CASE_ID` / `graph-show CASE_ID [--node ID]` | build + export the evidence graph (migrates to schema v3 first) / show stats or one node |
+| `detect CASE_ID DETECTOR` | run ONE detector (timestomp, clock_skew, log_gap, log_clear, unmatched_connection), store the hits |
+| `detect-all CASE_ID` / `hits-show CASE_ID [--detector D]` | run every detector (humans and eval only) / show stored hits |
+| `eval-detectors CASE_ID... [--baseline-md FILE]` | EVAL ONLY: score detectors against the answer keys (+ robustness seeds 101-105) |
+| `style-audit CASE_ID... [--out FILE]` | EVAL ONLY: can key-referenced lines be told apart from benign ones by style? (report only) |
 | `eval-coverage CASE_ID... [--baseline-md FILE]` | EVAL ONLY: answer-key coverage, count/alignment checks, Hayabusa-only baseline |
 
 Datasets live in `data/downloads/` (gitignored); see `docs/scenarios.md`. The current scenario is

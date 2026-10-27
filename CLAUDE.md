@@ -37,7 +37,7 @@ Agents may all use the same local model with different prompts and different too
 - Phase 2.1: Synthetic/real alignment and key completion [DONE]
 - Phase 2.2: Cross-host synthetic links [DONE]
 - Phase 3: Forensic tool layer and normalized event format [DONE]
-- Phase 4: Evidence graph and contradiction detection [TODO]
+- Phase 4: Evidence graph and contradiction detectors [DONE]
 - Phase 5: Agent core (LLM client, planner loop, citation verifier) [TODO]
 - Phase 6: Skeptic, calibration, missing-evidence reasoning [TODO]
 - Phase 7: Prompt-injection defense [TODO]
@@ -50,7 +50,14 @@ Agents may all use the same local model with different prompts and different too
 2. The answer key is never given to any agent or LLM prompt.
 3. Citation IDs for events are EVT ids (`EVT-<12hex>`); EV ids (files) are internal only and never appear in the agent view, as do original filenames, source keys, real hostnames and real timestamps.
 
+## Detectors, graph and tools (Phase 4, enforced by tests)
+- D1: detectors, the evidence graph and the tool registry live in `chainofproof/tools/` (and `graph/`) and use ONLY agent-view data: they never import `chainofproof.eval`, scenario/answer-key modules, `event_eval_meta`, `pair=`/`synth_only` markers or any key.
+- D2: detectors are separate, individually callable tools with explicit parameters. Nothing in the query API runs them automatically; agents decide to call them. "Run all detectors" exists only in the eval harness and the `detect-all` CLI.
+- D3: detector thresholds come from first principles, live in `config/settings.yaml` (section `detectors`) and `docs/decisions.md`, and are never tuned afterwards to improve scores.
+- D6: detector hits are citable evidence: citation ids are `EVT-<12hex>` (events) or `HIT-######` (detector hits). `FND-####` stays reserved for Phase 5 agent findings.
+
 ## Conventions
+- IDs added in Phase 4: detector hits `HIT-######`.
 - IDs added in Phase 3: event ids `EVT-<12hex>` (sha256 of evidence sha256 + ":" + record locator), run ids `RUN-000001`, detection ids `DET-000001`; evidence labels `<KIND>-<6hex>` (EVTX/FSTL/AUTH).
 - Python 3.11+, src layout, package name chainofproof, type hints everywhere, pydantic v2 for schemas, pathlib for paths.
 - Use the logging module in library code (no print), rich/typer for CLI output.

@@ -287,3 +287,15 @@ def test_auth_parser_rejects_malformed_lines_with_line_number(tmp_path, line, no
     f.write_text("# c\n\n" + line + "\n", encoding="utf-8")
     with pytest.raises(ParseError, match=f"line {no}"):
         list(iter_auth_log(f, vctx(SourceKindName.auth_log)))
+
+
+def test_auth_parser_populates_pipe_name_for_named_pipe_lines(tmp_path):
+    f = tmp_path / "auth.log"
+    f.write_text(
+        f"seq=000001 ts={T} host=WS-FIN-07 event=NAMED_PIPE_OPEN user=unknown src_ip=10.0.0.1 "
+        "dst_host=WS-FIN-07 pipe=svchost-X-8116-stdin pair=pipe_name:svchost-X-8116-stdin\n",
+        encoding="utf-8",
+    )
+    ((ev, meta),) = list(iter_auth_log(f, vctx(SourceKindName.auth_log)))
+    assert ev.pipe_name == "svchost-X-8116-stdin" and ev.event_type == EventType.other
+    assert "pair" not in ev.model_dump_json() and meta.pair_field == "pipe_name"

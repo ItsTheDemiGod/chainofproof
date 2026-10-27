@@ -19,6 +19,21 @@ tools:
   hayabusa_dir: tools_bin/hayabusa
   timeout_seconds: 300
 
+# Detector thresholds (Phase 4). Set from first principles BEFORE looking at results; never
+# tuned afterwards (see docs/decisions.md for the one-line rationale of each).
+detectors:
+  timestomp:
+    min_delta_seconds: 3600        # ordinary si/fn jitter is seconds; one hour is far beyond it
+  clock_skew:
+    min_abs_delta_seconds: 2.0     # sources have 1 s resolution; below 2 s is rounding noise
+    min_independent_pairs: 2       # one pair can be a coincidence; two agreeing pairs are a pattern
+    agreement_seconds: 1.0         # pairs agree when they differ by at most the 1 s resolution
+  log_gap:
+    max_other_events_listed: 10    # listing cap only, not a detection threshold
+  log_clear:
+    window_seconds: 60             # "immediately after": one minute of follow-on activity
+  unmatched_connection: {}
+
 optional_cloud:
   enabled: false
   provider: none
